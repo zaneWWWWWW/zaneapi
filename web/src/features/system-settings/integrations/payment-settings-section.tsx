@@ -25,6 +25,7 @@ import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
 import * as z from 'zod'
 
+import { ReactIconByName } from '@/components/react-icon-by-name'
 import { RiskAcknowledgementDialog } from '@/components/risk-acknowledgement-dialog'
 import {
   Alert,
@@ -89,6 +90,25 @@ function isHttpOriginUrl(value: string) {
     const isHttpProtocol = url.protocol === 'http:' || url.protocol === 'https:'
     const hasNoPath = url.pathname === '' || url.pathname === '/'
     return isHttpProtocol && hasNoPath && !url.search && !url.hash
+  } catch {
+    return false
+  }
+}
+
+function isHupijiaoPaymentUrl(value: string) {
+  const trimmed = value.trim()
+  if (!trimmed) return true
+
+  try {
+    const url = new URL(trimmed)
+    return (
+      url.protocol === 'https:' &&
+      url.pathname === '/payment/do.html' &&
+      !url.username &&
+      !url.password &&
+      !url.search &&
+      !url.hash
+    )
   } catch {
     return false
   }
@@ -159,6 +179,21 @@ const paymentSchema = z.object({
       })
     }
   }),
+  HupijiaoEnabled: z.boolean(),
+  HupijiaoEndpoint: z
+    .string()
+    .refine(
+      isHupijiaoPaymentUrl,
+      'Enter the complete Hupijiao HTTPS payment URL, for example https://api.dpweixin.com/payment/do.html.'
+    ),
+  HupijiaoDisplayName: z
+    .string()
+    .trim()
+    .min(1, 'Wallet display name is required')
+    .max(64),
+  HupijiaoIcon: z.string().trim().max(255),
+  HupijiaoAppID: z.string(),
+  HupijiaoAppSecret: z.string(),
   WaffoEnabled: z.boolean(),
   WaffoApiKey: z.string(),
   WaffoPrivateKey: z.string(),
@@ -437,6 +472,12 @@ export function PaymentSettingsSection({
       CreemWebhookSecret: values.CreemWebhookSecret.trim(),
       CreemTestMode: values.CreemTestMode,
       CreemProducts: values.CreemProducts.trim(),
+      HupijiaoEnabled: values.HupijiaoEnabled,
+      HupijiaoEndpoint: values.HupijiaoEndpoint.trim(),
+      HupijiaoDisplayName: values.HupijiaoDisplayName.trim(),
+      HupijiaoIcon: values.HupijiaoIcon.trim(),
+      HupijiaoAppID: values.HupijiaoAppID.trim(),
+      HupijiaoAppSecret: values.HupijiaoAppSecret.trim(),
       WaffoEnabled: values.WaffoEnabled,
       WaffoSandbox: values.WaffoSandbox,
       WaffoMerchantId: values.WaffoMerchantId.trim(),
@@ -482,6 +523,12 @@ export function PaymentSettingsSection({
       CreemWebhookSecret: initialRef.current.CreemWebhookSecret.trim(),
       CreemTestMode: initialRef.current.CreemTestMode,
       CreemProducts: initialRef.current.CreemProducts.trim(),
+      HupijiaoEnabled: initialRef.current.HupijiaoEnabled,
+      HupijiaoEndpoint: initialRef.current.HupijiaoEndpoint.trim(),
+      HupijiaoDisplayName: initialRef.current.HupijiaoDisplayName.trim(),
+      HupijiaoIcon: initialRef.current.HupijiaoIcon.trim(),
+      HupijiaoAppID: initialRef.current.HupijiaoAppID.trim(),
+      HupijiaoAppSecret: initialRef.current.HupijiaoAppSecret.trim(),
       WaffoEnabled: initialRef.current.WaffoEnabled,
       WaffoSandbox: initialRef.current.WaffoSandbox,
       WaffoMerchantId: initialRef.current.WaffoMerchantId.trim(),
@@ -627,6 +674,45 @@ export function PaymentSettingsSection({
       normalizeJsonForComparison(initial.CreemProducts)
     ) {
       updates.push({ key: 'CreemProducts', value: sanitized.CreemProducts })
+    }
+
+    if (sanitized.HupijiaoEnabled !== initial.HupijiaoEnabled) {
+      updates.push({
+        key: 'HupijiaoEnabled',
+        value: sanitized.HupijiaoEnabled,
+      })
+    }
+
+    if (sanitized.HupijiaoEndpoint !== initial.HupijiaoEndpoint) {
+      updates.push({
+        key: 'HupijiaoEndpoint',
+        value: sanitized.HupijiaoEndpoint,
+      })
+    }
+
+    if (sanitized.HupijiaoDisplayName !== initial.HupijiaoDisplayName) {
+      updates.push({
+        key: 'HupijiaoDisplayName',
+        value: sanitized.HupijiaoDisplayName,
+      })
+    }
+
+    if (sanitized.HupijiaoIcon !== initial.HupijiaoIcon) {
+      updates.push({ key: 'HupijiaoIcon', value: sanitized.HupijiaoIcon })
+    }
+
+    if (sanitized.HupijiaoAppID !== initial.HupijiaoAppID) {
+      updates.push({ key: 'HupijiaoAppID', value: sanitized.HupijiaoAppID })
+    }
+
+    if (
+      sanitized.HupijiaoAppSecret &&
+      sanitized.HupijiaoAppSecret !== initial.HupijiaoAppSecret
+    ) {
+      updates.push({
+        key: 'HupijiaoAppSecret',
+        value: sanitized.HupijiaoAppSecret,
+      })
     }
 
     if (sanitized.WaffoEnabled !== initial.WaffoEnabled) {
@@ -877,9 +963,10 @@ export function PaymentSettingsSection({
           />
           <Tabs defaultValue='general' className='min-w-0'>
             <div className='overflow-x-auto pb-1'>
-              <TabsList className='grid min-w-[44rem] grid-cols-6'>
+              <TabsList className='grid min-w-[52rem] grid-cols-7'>
                 <TabsTrigger value='general'>{t('General')}</TabsTrigger>
                 <TabsTrigger value='epay'>Epay</TabsTrigger>
+                <TabsTrigger value='hupijiao'>{t('Hupijiao')}</TabsTrigger>
                 <TabsTrigger value='stripe'>{t('Stripe')}</TabsTrigger>
                 <TabsTrigger value='creem'>Creem</TabsTrigger>
                 <TabsTrigger value='waffo-pancake'>Waffo Pancake</TabsTrigger>
@@ -998,7 +1085,7 @@ export function PaymentSettingsSection({
                       </FormControl>
                       <FormDescription>
                         {t(
-                          'Configured as PayMethods JSON. The type value decides which payment flow is used: stripe for Stripe, waffo_pancake for Waffo Pancake, and other values are sent to Epay as the type parameter.'
+                          'Hupijiao is managed in its own tab and is added to the wallet automatically when enabled. Do not add a hupijiao entry here. Stripe and Waffo Pancake use their reserved type values; other values are sent to Epay.'
                         )}
                       </FormDescription>
                       <FormMessage />
@@ -1223,6 +1310,196 @@ export function PaymentSettingsSection({
                           <Input
                             type='password'
                             placeholder={t('Enter new key to update')}
+                            autoComplete='new-password'
+                            {...field}
+                            onChange={(event) =>
+                              field.onChange(event.target.value)
+                            }
+                          />
+                        </FormControl>
+                        <FormDescription>
+                          {t('Leave blank unless rotating the secret')}
+                        </FormDescription>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
+              </div>
+            </TabsContent>
+
+            <TabsContent
+              value='hupijiao'
+              className={paymentTabContentClassName}
+            >
+              <div className='space-y-4'>
+                <div>
+                  <h3 className='text-lg font-medium'>
+                    {t('Hupijiao Gateway')}
+                  </h3>
+                  <p className='text-muted-foreground text-sm'>
+                    {t(
+                      'Configuration for Hupijiao Payment, including compatible standby gateways.'
+                    )}
+                  </p>
+                </div>
+
+                <FormField
+                  control={form.control}
+                  name='HupijiaoEnabled'
+                  render={({ field }) => (
+                    <FormItem className='flex items-center justify-between gap-4 rounded-lg border p-4'>
+                      <div className='space-y-1'>
+                        <FormLabel>{t('Enable Hupijiao payments')}</FormLabel>
+                        <FormDescription>
+                          {t(
+                            'Users can choose Hupijiao only when this switch is enabled and all required fields are configured.'
+                          )}
+                        </FormDescription>
+                      </div>
+                      <FormControl>
+                        <Switch
+                          checked={field.value}
+                          onCheckedChange={field.onChange}
+                        />
+                      </FormControl>
+                    </FormItem>
+                  )}
+                />
+
+                <div className='grid gap-6 md:grid-cols-2'>
+                  <FormField
+                    control={form.control}
+                    name='HupijiaoDisplayName'
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>{t('Wallet display name')}</FormLabel>
+                        <FormControl>
+                          <Input
+                            placeholder={t('Alipay')}
+                            maxLength={64}
+                            {...field}
+                          />
+                        </FormControl>
+                        <FormDescription>
+                          {t(
+                            'Shown to users as the payment method name in the wallet.'
+                          )}
+                        </FormDescription>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={form.control}
+                    name='HupijiaoIcon'
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>{t('Wallet icon')}</FormLabel>
+                        <FormControl>
+                          <div className='flex items-center gap-2'>
+                            <Input
+                              placeholder='SiAlipay'
+                              maxLength={255}
+                              {...field}
+                            />
+                            {field.value && (
+                              <ReactIconByName
+                                name={field.value}
+                                className='text-muted-foreground size-5 shrink-0'
+                                title={field.value}
+                              />
+                            )}
+                          </div>
+                        </FormControl>
+                        <FormDescription>
+                          {t(
+                            'Enter a react-icons component name such as SiAlipay, or an HTTPS image URL.'
+                          )}
+                        </FormDescription>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
+
+                <Alert>
+                  <ShieldAlert className='h-4 w-4' />
+                  <AlertTitle>{t('Callback URL')}</AlertTitle>
+                  <AlertDescription>
+                    <code className='bg-muted rounded px-1 py-0.5 text-xs'>
+                      {`${
+                        removeTrailingSlash(
+                          currentFormValues.CustomCallbackAddress
+                        ) || '<ServerAddress>'
+                      }/api/user/hupijiao/notify`}
+                    </code>
+                    <p className='mt-2'>
+                      {t(
+                        'The callback base is configured under General. Hupijiao requires a public HTTPS address.'
+                      )}
+                    </p>
+                  </AlertDescription>
+                </Alert>
+
+                <FormField
+                  control={form.control}
+                  name='HupijiaoEndpoint'
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>{t('Hupijiao endpoint')}</FormLabel>
+                      <FormControl>
+                        <Input
+                          placeholder='https://api.dpweixin.com/payment/do.html'
+                          autoComplete='url'
+                          {...field}
+                          onChange={(event) =>
+                            field.onChange(event.target.value)
+                          }
+                        />
+                      </FormControl>
+                      <FormDescription>
+                        {t(
+                          'Enter the complete HTTPS do.html address supplied by Hupijiao.'
+                        )}
+                      </FormDescription>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <div className='grid items-start gap-6 md:grid-cols-2'>
+                  <FormField
+                    control={form.control}
+                    name='HupijiaoAppID'
+                    render={({ field }) => (
+                      <FormItem className='grid-rows-[auto_2.25rem_auto]'>
+                        <FormLabel>{t('Hupijiao App ID')}</FormLabel>
+                        <FormControl>
+                          <Input
+                            autoComplete='off'
+                            {...field}
+                            onChange={(event) =>
+                              field.onChange(event.target.value)
+                            }
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={form.control}
+                    name='HupijiaoAppSecret'
+                    render={({ field }) => (
+                      <FormItem className='grid-rows-[auto_2.25rem_auto]'>
+                        <FormLabel>{t('Hupijiao App Secret')}</FormLabel>
+                        <FormControl>
+                          <Input
+                            type='password'
+                            placeholder={t('Enter new secret to update')}
                             autoComplete='new-password'
                             {...field}
                             onChange={(event) =>

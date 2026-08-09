@@ -40,7 +40,13 @@ import { Input } from '@/components/ui/input'
 const createPaymentMethodDialogSchema = (t: (key: string) => string) =>
   z.object({
     name: z.string().min(1, t('Payment method name is required')),
-    type: z.string().min(1, t('Payment type key is required')),
+    type: z
+      .string()
+      .min(1, t('Payment type key is required'))
+      .refine(
+        (value) => value.trim().toLowerCase() !== 'hupijiao',
+        t('Hupijiao is managed in its own tab and cannot be added here.')
+      ),
     icon: z.string().optional(),
     min_topup: z.string().optional(),
   })
@@ -249,7 +255,7 @@ export function PaymentMethodDialog({
                 </FormControl>
                 <FormDescription className='leading-relaxed'>
                   {t(
-                    'Used to decide the payment flow. Built-in keys include stripe for Stripe and waffo_pancake for Waffo Pancake; other values are sent to Epay as the type parameter.'
+                    'Used to decide the payment flow. Hupijiao is managed in its own tab and cannot be added here. Built-in keys include stripe for Stripe and waffo_pancake for Waffo Pancake; other values are sent to Epay as the type parameter.'
                   )}
                 </FormDescription>
                 <FormMessage />

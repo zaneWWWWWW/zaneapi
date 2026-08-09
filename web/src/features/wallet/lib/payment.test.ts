@@ -22,7 +22,10 @@ import { describe, test } from 'node:test'
 import { PAYMENT_TYPES } from '../constants'
 import {
   dispatchSelectedPayment,
+  getSubscriptionEpayMethods,
+  hasConfigurableTopupMethod,
   isStripePayment,
+  isHupijiaoPayment,
   isWaffoPayment,
   isWaffoPancakePayment,
 } from './payment'
@@ -33,7 +36,43 @@ describe('payment type classification', () => {
     assert.equal(isWaffoPayment(PAYMENT_TYPES.WAFFO_PANCAKE), false)
     assert.equal(isWaffoPancakePayment(PAYMENT_TYPES.WAFFO_PANCAKE), true)
     assert.equal(isWaffoPancakePayment(PAYMENT_TYPES.WAFFO), false)
+    assert.equal(isHupijiaoPayment(PAYMENT_TYPES.HUPIJIAO), true)
+    assert.equal(isHupijiaoPayment(PAYMENT_TYPES.WAFFO), false)
     assert.equal(isStripePayment(PAYMENT_TYPES.STRIPE), true)
+  })
+
+  test('excludes Hupijiao and other dedicated providers from subscription Epay methods', () => {
+    const methods = getSubscriptionEpayMethods([
+      { name: 'Alipay', type: PAYMENT_TYPES.ALIPAY },
+      { name: 'Hupijiao', type: PAYMENT_TYPES.HUPIJIAO },
+      { name: 'Stripe', type: PAYMENT_TYPES.STRIPE },
+      { name: 'Waffo', type: PAYMENT_TYPES.WAFFO },
+    ])
+
+    assert.deepEqual(methods, [{ name: 'Alipay', type: PAYMENT_TYPES.ALIPAY }])
+  })
+
+  test('treats Hupijiao as an available amount-based gateway on its own', () => {
+    const topupInfo = {
+      enable_online_topup: false,
+      enable_stripe_topup: false,
+      enable_hupijiao_topup: true,
+      pay_methods: [{ name: 'Hupijiao', type: PAYMENT_TYPES.HUPIJIAO }],
+      min_topup: 1,
+      stripe_min_topup: 1,
+      amount_options: [],
+      discount: {},
+    }
+
+    assert.equal(hasConfigurableTopupMethod(topupInfo), true)
+    assert.equal(
+      hasConfigurableTopupMethod({
+        ...topupInfo,
+        enable_hupijiao_topup: false,
+        pay_methods: [],
+      }),
+      false
+    )
   })
 })
 
@@ -57,6 +96,10 @@ describe('payment dispatch', () => {
           calls.push('pancake')
           return false
         },
+        hupijiao: async () => {
+          calls.push('hupijiao')
+          return false
+        },
       }
     )
 
@@ -77,10 +120,35 @@ describe('payment dispatch', () => {
           return true
         },
         waffoPancake: async () => false,
+        hupijiao: async () => false,
       }
     )
 
     assert.equal(success, false)
     assert.equal(called, false)
+  })
+
+  test('routes Hupijiao to its dedicated checkout processor', async () => {
+    const calls: string[] = []
+    const success = await dispatchSelectedPayment(
+      { name: 'Hupijiao', type: PAYMENT_TYPES.HUPIJIAO },
+      50,
+      null,
+      {
+        regular: async () => {
+          calls.push('regular')
+          return false
+        },
+        waffo: async () => false,
+        waffoPancake: async () => false,
+        hupijiao: async (amount) => {
+          calls.push(`hupijiao:${amount}`)
+          return true
+        },
+      }
+    )
+
+    assert.equal(success, true)
+    assert.deepEqual(calls, ['hupijiao:50'])
   })
 })
