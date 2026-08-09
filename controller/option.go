@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
+	"unicode/utf8"
 
 	"github.com/QuantumNous/new-api/common"
 	"github.com/QuantumNous/new-api/i18n"
@@ -146,6 +147,25 @@ func UpdateOption(c *gin.Context) {
 			common.ApiErrorI18n(c, i18n.MsgPaymentComplianceRequired)
 			return
 		}
+	case "HupijiaoEndpoint":
+		if value := strings.TrimSpace(option.Value.(string)); value != "" && !isHupijiaoPaymentURLValid(value) {
+			common.ApiErrorMsg(c, "虎皮椒网关必须是完整的 HTTPS /payment/do.html 地址")
+			return
+		}
+	case "HupijiaoDisplayName":
+		value := strings.TrimSpace(option.Value.(string))
+		if value == "" || utf8.RuneCountInString(value) > 64 {
+			common.ApiErrorMsg(c, "虎皮椒钱包显示名称必须为 1-64 个字符")
+			return
+		}
+		option.Value = value
+	case "HupijiaoIcon":
+		value := strings.TrimSpace(option.Value.(string))
+		if len(value) > 255 {
+			common.ApiErrorMsg(c, "虎皮椒钱包图标不能超过 255 个字符")
+			return
+		}
+		option.Value = value
 	default:
 		if isPaymentComplianceOptionKey(option.Key) {
 			common.ApiErrorMsg(c, "合规确认字段不允许通过通用设置接口修改")

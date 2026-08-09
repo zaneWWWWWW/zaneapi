@@ -82,6 +82,26 @@ export function isWaffoPayment(paymentType: string): boolean {
   return paymentType === PAYMENT_TYPES.WAFFO
 }
 
+/** Check if the payment method uses the dedicated Hupijiao gateway. */
+export function isHupijiaoPayment(paymentType: string): boolean {
+  return paymentType === PAYMENT_TYPES.HUPIJIAO
+}
+
+/** Keep dedicated checkout providers out of the generic subscription Epay flow. */
+export function getSubscriptionEpayMethods(
+  paymentMethods: PaymentMethod[] = []
+): PaymentMethod[] {
+  return paymentMethods.filter(
+    (method) =>
+      Boolean(method?.type) &&
+      !isStripePayment(method.type) &&
+      method.type !== PAYMENT_TYPES.CREEM &&
+      !isHupijiaoPayment(method.type) &&
+      !isWaffoPayment(method.type) &&
+      !isWaffoPancakePayment(method.type)
+  )
+}
+
 /**
  * Check if payment method is Waffo Pancake
  *
@@ -97,6 +117,7 @@ export interface PaymentProcessors {
   regular: (topupAmount: number, paymentType: string) => Promise<boolean>
   waffo: (topupAmount: number, payMethodIndex: number) => Promise<boolean>
   waffoPancake: (topupAmount: number) => Promise<boolean>
+  hupijiao: (topupAmount: number) => Promise<boolean>
 }
 
 export async function dispatchSelectedPayment(
@@ -114,6 +135,10 @@ export async function dispatchSelectedPayment(
 
   if (isWaffoPancakePayment(paymentMethod.type)) {
     return processors.waffoPancake(topupAmount)
+  }
+
+  if (isHupijiaoPayment(paymentMethod.type)) {
+    return processors.hupijiao(topupAmount)
   }
 
   return processors.regular(topupAmount, paymentMethod.type)
@@ -144,6 +169,10 @@ export function getDefaultPaymentType(topupInfo: TopupInfo | null): string {
     return PAYMENT_TYPES.WAFFO_PANCAKE
   }
 
+  if (topupInfo.enable_hupijiao_topup) {
+    return PAYMENT_TYPES.HUPIJIAO
+  }
+
   return DEFAULT_PAYMENT_TYPE
 }
 
@@ -171,7 +200,24 @@ export function getMinTopupAmount(topupInfo: TopupInfo | null): number {
     return topupInfo.waffo_pancake_min_topup || DEFAULT_MIN_TOPUP
   }
 
+  if (topupInfo.enable_hupijiao_topup) {
+    return topupInfo.min_topup || DEFAULT_MIN_TOPUP
+  }
+
   return DEFAULT_MIN_TOPUP
+}
+
+/** Whether the amount-based recharge form has at least one available gateway. */
+export function hasConfigurableTopupMethod(
+  topupInfo: TopupInfo | null
+): boolean {
+  return Boolean(
+    topupInfo?.enable_online_topup ||
+    topupInfo?.enable_stripe_topup ||
+    topupInfo?.enable_waffo_topup ||
+    topupInfo?.enable_waffo_pancake_topup ||
+    topupInfo?.enable_hupijiao_topup
+  )
 }
 
 /**

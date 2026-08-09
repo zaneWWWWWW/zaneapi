@@ -42,6 +42,7 @@ export type StripePaymentResponse = ApiResponse<{ pay_link: string }>
 export type AffiliateCodeResponse = ApiResponse<string>
 export type AffiliateTransferResponse = ApiResponse
 export type CreemPaymentResponse = ApiResponse<{ checkout_url: string }>
+export type HupijiaoPaymentResponse = ApiResponse<{ url: string }>
 export type WaffoPaymentResponse = ApiResponse<
   { payment_url?: string } | string
 >
@@ -140,6 +141,8 @@ export interface TopupInfo {
   enable_creem_topup?: boolean
   /** Available Creem products */
   creem_products?: CreemProduct[]
+  /** Whether Hupijiao topup is enabled */
+  enable_hupijiao_topup?: boolean
   /** Whether Waffo topup is enabled */
   enable_waffo_topup?: boolean
   /** Available Waffo payment methods */
@@ -194,6 +197,12 @@ export interface WaffoPaymentRequest {
   amount: number
   /** Optional server-side Waffo payment method index */
   pay_method_index?: number
+}
+
+/** Hupijiao payment request parameters */
+export interface HupijiaoPaymentRequest {
+  /** Topup amount */
+  amount: number
 }
 
 /**

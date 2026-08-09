@@ -5225,6 +5225,26 @@
     "Record complete request and response bodies": "記錄完整請求與回應內容",
     "Stores the unredacted downstream and upstream request and response bodies. This setting only applies while relay tracing is enabled.": "記錄未遮罩的下游與上游請求、回應正文。僅在啟用轉發請求追蹤時生效。",
     "Privacy and storage warning: complete bodies are written to server logs and can contain prompts, generated media, personal data, and secrets supplied in request bodies. Enable this only for short troubleshooting windows; it can substantially increase log storage and memory use.": "隱私與儲存警告：完整正文會寫入伺服器日誌，可能包含提示詞、生成媒體、個人資料及請求正文中的密鑰。僅應在短時間排障時啟用；它會顯著增加日誌儲存和記憶體使用量。",
-    "Standard relay tracing uses redacted previews and omits binary media. Search server logs for relay_trace= and the request ID when investigating a failure.": "標準轉發追蹤使用遮罩預覽，並省略二進位媒體。排查失敗時可依 relay_trace= 和請求 ID 搜尋伺服器日誌。"
+    "Standard relay tracing uses redacted previews and omits binary media. Search server logs for relay_trace= and the request ID when investigating a failure.": "標準轉發追蹤使用遮罩預覽，並省略二進位媒體。排查失敗時可依 relay_trace= 和請求 ID 搜尋伺服器日誌。",
+    "Hupijiao": "虎皮椒支付",
+    "Hupijiao Gateway": "虎皮椒支付閘道",
+    "Configuration for Hupijiao Payment, including compatible standby gateways.": "設定虎皮椒支付及相容的備用閘道。",
+    "Enable Hupijiao payments": "啟用虎皮椒支付",
+    "Users can choose Hupijiao only when this switch is enabled and all required fields are configured.": "只有開啟此開關並完整設定所有必填項後，使用者才能選擇虎皮椒支付。",
+    "The callback base is configured under General. Hupijiao requires a public HTTPS address.": "回呼站點根地址在一般設定中配置；虎皮椒要求使用公網 HTTPS 地址。",
+    "Hupijiao endpoint": "虎皮椒介面地址",
+    "Enter the complete HTTPS do.html address supplied by Hupijiao.": "填寫虎皮椒提供的完整 HTTPS do.html 地址。",
+    "Hupijiao App ID": "虎皮椒 App ID",
+    "Hupijiao App Secret": "虎皮椒 App Secret",
+    "Enter new secret to update": "輸入新密鑰以更新",
+    "Enter the complete Hupijiao HTTPS payment URL, for example https://api.dpweixin.com/payment/do.html.": "請輸入完整的虎皮椒 HTTPS 支付地址，例如 https://api.dpweixin.com/payment/do.html。",
+    "Hupijiao is managed in its own tab and cannot be added here.": "虎皮椒由獨立頁籤管理，不能在此新增。",
+    "Used to decide the payment flow. Hupijiao is managed in its own tab and cannot be added here. Built-in keys include stripe for Stripe and waffo_pancake for Waffo Pancake; other values are sent to Epay as the type parameter.": "用於決定支付流程。虎皮椒由獨立頁籤管理，不能在此新增。stripe 和 waffo_pancake 是保留的獨立支付標識；其他值會作為 type 參數傳送給 Epay。",
+    "Hupijiao is managed in its own tab and is added to the wallet automatically when enabled. Do not add a hupijiao entry here. Stripe and Waffo Pancake use their reserved type values; other values are sent to Epay.": "虎皮椒由獨立頁籤管理，啟用後會自動加入錢包，請勿在此新增 hupijiao。Stripe 和 Waffo Pancake 使用各自的保留標識；其他值會傳送給 Epay。",
+    "Wallet display name": "錢包顯示名稱",
+    "Wallet display name is required": "錢包顯示名稱不能為空",
+    "Shown to users as the payment method name in the wallet.": "在錢包中作為支付方式名稱顯示給使用者。",
+    "Wallet icon": "錢包圖示",
+    "Enter a react-icons component name such as SiAlipay, or an HTTPS image URL.": "輸入 react-icons 元件名稱，例如 SiAlipay；也可輸入 HTTPS 圖片網址。"
   }
 }
