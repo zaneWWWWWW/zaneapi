@@ -151,8 +151,22 @@ func TestGetAndValidOpenAIImageRequestNBounds(t *testing.T) {
 		})
 	}
 
-	t.Run("absent response_format defaults to b64_json for gpt-image", func(t *testing.T) {
+	t.Run("absent response_format stays empty for gpt-image-2", func(t *testing.T) {
 		c := newJSONContext(t, `{"model":"gpt-image-2","prompt":"a cat"}`)
+		req, err := GetAndValidOpenAIImageRequest(c, relayconstant.RelayModeImagesGenerations)
+		require.NoError(t, err)
+		require.Empty(t, req.ResponseFormat)
+	})
+
+	t.Run("absent response_format stays empty for versioned gpt-image-2", func(t *testing.T) {
+		c := newJSONContext(t, `{"model":"gpt-image-2-2026-08-11","prompt":"a cat"}`)
+		req, err := GetAndValidOpenAIImageRequest(c, relayconstant.RelayModeImagesGenerations)
+		require.NoError(t, err)
+		require.Empty(t, req.ResponseFormat)
+	})
+
+	t.Run("absent response_format defaults to b64_json for gpt-image-1", func(t *testing.T) {
+		c := newJSONContext(t, `{"model":"gpt-image-1","prompt":"a cat"}`)
 		req, err := GetAndValidOpenAIImageRequest(c, relayconstant.RelayModeImagesGenerations)
 		require.NoError(t, err)
 		require.Equal(t, "b64_json", req.ResponseFormat)
