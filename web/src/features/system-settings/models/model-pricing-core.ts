@@ -64,6 +64,21 @@ export type ModelRatioData = {
   requestRuleExpr?: string
 }
 
+export function resolveModelPricingMode(data: {
+  billingMode?: string
+  price?: string
+}): PricingMode {
+  if (
+    data.billingMode === 'per-token' ||
+    data.billingMode === 'per-request' ||
+    data.billingMode === 'tiered_expr'
+  ) {
+    return data.billingMode
+  }
+
+  return data.price ? 'per-request' : 'per-token'
+}
+
 export type PreviewRow = {
   key: string
   label: string

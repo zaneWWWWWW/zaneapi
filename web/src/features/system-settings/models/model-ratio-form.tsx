@@ -230,7 +230,7 @@ export const ModelRatioForm = memo(function ModelRatioForm({
             <RotateCcw data-icon='inline-start' />
             {t('Reset prices')}
           </Button>
-          {editMode === 'json' && (
+          {(editMode === 'json' || form.formState.isDirty) && (
             <Button
               type='button'
               size='sm'
