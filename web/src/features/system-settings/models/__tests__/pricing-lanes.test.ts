@@ -23,6 +23,7 @@ import {
   buildPreviewRows,
   createInitialLaneState,
   laneConfigs,
+  resolveModelPricingMode,
   type ModelPricingFormValues,
 } from '../model-pricing-core'
 
@@ -123,5 +124,19 @@ describe('model pricing lanes', () => {
         'Audio output price',
       ]
     )
+  })
+
+  test('uses the selected token mode even when a previous fixed price remains in the draft', () => {
+    assert.equal(
+      resolveModelPricingMode({
+        billingMode: 'per-token',
+        price: '0.5',
+      }),
+      'per-token'
+    )
+  })
+
+  test('falls back to fixed-price mode for legacy drafts without an explicit mode', () => {
+    assert.equal(resolveModelPricingMode({ price: '0.5' }), 'per-request')
   })
 })
