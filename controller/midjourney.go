@@ -213,7 +213,7 @@ func runMidjourneyTaskUpdateOnce(ctx context.Context, report func(processed, tot
 			if err != nil {
 				logger.LogError(ctx, "UpdateMidjourneyTask task error: "+err.Error())
 			} else if won && shouldReturnQuota {
-				err = model.IncreaseUserQuota(task.UserId, task.Quota, false)
+				err = model.IncreaseUserQuota(task.UserId, task.Quota, true)
 				if err != nil {
 					logger.LogError(ctx, "fail to increase user quota: "+err.Error())
 				}

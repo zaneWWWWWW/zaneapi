@@ -4,7 +4,6 @@ import (
 	"errors"
 	"fmt"
 	"math"
-	"strings"
 	"time"
 
 	"github.com/QuantumNous/new-api/common"
@@ -90,15 +89,6 @@ func PreWssConsumeQuota(ctx *gin.Context, relayInfo *relaycommon.RelayInfo, usag
 	if relayInfo.UsePrice {
 		return nil
 	}
-	userQuota, err := model.GetUserQuota(relayInfo.UserId, false)
-	if err != nil {
-		return err
-	}
-
-	token, err := model.GetTokenByKey(strings.TrimPrefix(relayInfo.TokenKey, "sk-"), false)
-	if err != nil {
-		return err
-	}
 
 	modelName := relayInfo.OriginModelName
 	textInputTokens := usage.InputTokenDetails.TextTokens
@@ -139,15 +129,22 @@ func PreWssConsumeQuota(ctx *gin.Context, relayInfo *relaycommon.RelayInfo, usag
 	quota, clamp := calculateAudioQuota(quotaInfo)
 	noteQuotaClamp(relayInfo, clamp)
 
-	if userQuota < quota {
-		return fmt.Errorf("user quota is not enough, user quota: %s, need quota: %s", logger.FormatQuota(userQuota), logger.FormatQuota(quota))
+	if quota < 0 {
+		return fmt.Errorf("realtime quota cannot be negative: %d", quota)
+	}
+	if quota == 0 {
+		return nil
 	}
 
-	if !token.UnlimitedQuota && token.RemainQuota < quota {
-		return fmt.Errorf("token quota is not enough, token remain quota: %s, need quota: %s", logger.FormatQuota(token.RemainQuota), logger.FormatQuota(quota))
+	if relayInfo.Billing != nil {
+		targetQuota := relayInfo.FinalPreConsumedQuota + quota
+		if err := relayInfo.Billing.Reserve(targetQuota); err != nil {
+			return err
+		}
+		return nil
 	}
 
-	err = PostConsumeQuota(relayInfo, quota, 0, false)
+	err := PostConsumeQuota(relayInfo, quota, 0, false)
 	if err != nil {
 		return err
 	}
@@ -388,27 +385,16 @@ func PreConsumeTokenQuota(relayInfo *relaycommon.RelayInfo, quota int) error {
 	if quota < 0 {
 		return errors.New("quota 不能为负数！")
 	}
-	if relayInfo.IsPlayground {
+	if relayInfo.IsPlayground || relayInfo.TokenUnlimited {
 		return nil
 	}
-	//if relayInfo.TokenUnlimited {
-	//	return nil
-	//}
-	token, err := model.GetTokenByKey(relayInfo.TokenKey, false)
-	if err != nil {
-		return err
-	}
-	if !relayInfo.TokenUnlimited && token.RemainQuota < quota {
-		return fmt.Errorf("token quota is not enough, token remain quota: %s, need quota: %s", logger.FormatQuota(token.RemainQuota), logger.FormatQuota(quota))
-	}
-	err = model.DecreaseTokenQuota(relayInfo.TokenId, relayInfo.TokenKey, quota)
-	if err != nil {
-		return err
-	}
-	return nil
+	return model.DecreaseTokenQuota(relayInfo.TokenId, relayInfo.TokenKey, quota)
 }
 
 func PostConsumeQuota(relayInfo *relaycommon.RelayInfo, quota int, preConsumedQuota int, sendEmail bool) (err error) {
+	if quota == 0 {
+		return nil
+	}
 
 	// 1) Consume from wallet quota OR subscription item
 	if relayInfo != nil && relayInfo.BillingSource == BillingSourceSubscription {
@@ -427,20 +413,39 @@ func PostConsumeQuota(relayInfo *relaycommon.RelayInfo, quota int, preConsumedQu
 		if quota > 0 {
 			err = model.DecreaseUserQuota(relayInfo.UserId, quota, false)
 		} else {
-			err = model.IncreaseUserQuota(relayInfo.UserId, -quota, false)
+			err = model.IncreaseUserQuota(relayInfo.UserId, -quota, true)
 		}
 		if err != nil {
 			return err
 		}
 	}
 
-	if !relayInfo.IsPlayground {
+	if !relayInfo.IsPlayground && !relayInfo.TokenUnlimited {
 		if quota > 0 {
 			err = model.DecreaseTokenQuota(relayInfo.TokenId, relayInfo.TokenKey, quota)
 		} else {
 			err = model.IncreaseTokenQuota(relayInfo.TokenId, relayInfo.TokenKey, -quota)
 		}
 		if err != nil {
+			// Keep the two funding sources consistent when token settlement fails.
+			// The rollback is best-effort and is itself atomic.
+			if relayInfo.BillingSource == BillingSourceSubscription {
+				if relayInfo.SubscriptionId > 0 {
+					if rollbackErr := model.PostConsumeUserSubscriptionDelta(relayInfo.SubscriptionId, -int64(quota)); rollbackErr != nil {
+						common.SysLog("error rolling back subscription quota after token settlement failed: " + rollbackErr.Error())
+					} else {
+						relayInfo.SubscriptionPostDelta -= int64(quota)
+					}
+				}
+			} else if quota > 0 {
+				if rollbackErr := model.IncreaseUserQuota(relayInfo.UserId, quota, true); rollbackErr != nil {
+					common.SysLog("error rolling back wallet quota after token settlement failed: " + rollbackErr.Error())
+				}
+			} else {
+				if rollbackErr := model.DecreaseUserQuota(relayInfo.UserId, -quota, false); rollbackErr != nil {
+					common.SysLog("error rolling back wallet refund after token settlement failed: " + rollbackErr.Error())
+				}
+			}
 			return err
 		}
 	}

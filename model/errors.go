@@ -5,6 +5,9 @@ import "errors"
 // Common errors
 var (
 	ErrDatabase = errors.New("database error")
+	// ErrInsufficientQuota is returned when an atomic quota decrement cannot
+	// be applied without taking the balance below zero.
+	ErrInsufficientQuota = errors.New("insufficient quota")
 )
 
 // User auth errors

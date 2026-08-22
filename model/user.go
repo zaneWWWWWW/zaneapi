@@ -1233,23 +1233,34 @@ func IncreaseUserQuota(id int, quota int, db bool) (err error) {
 	if quota < 0 {
 		return errors.New("quota 不能为负数！")
 	}
-	gopool.Go(func() {
-		err := cacheIncrUserQuota(id, int64(quota))
-		if err != nil {
-			common.SysLog("failed to increase user quota: " + err.Error())
-		}
-	})
 	if !db && common.BatchUpdateEnabled {
 		addNewRecord(BatchUpdateTypeUserQuota, id, quota)
+		gopool.Go(func() {
+			if err := cacheIncrUserQuota(id, int64(quota)); err != nil {
+				common.SysLog("failed to increase user quota: " + err.Error())
+			}
+		})
 		return nil
 	}
-	return increaseUserQuota(id, quota)
+	err = increaseUserQuota(id, quota)
+	if err == nil {
+		gopool.Go(func() {
+			if cacheErr := cacheIncrUserQuota(id, int64(quota)); cacheErr != nil {
+				common.SysLog("failed to increase user quota: " + cacheErr.Error())
+			}
+		})
+	}
+	return err
 }
 
 func increaseUserQuota(id int, quota int) (err error) {
-	err = DB.Model(&User{}).Where("id = ?", id).Update("quota", gorm.Expr("quota + ?", quota)).Error
+	result := DB.Model(&User{}).Where("id = ?", id).Update("quota", gorm.Expr("quota + ?", quota))
+	err = result.Error
 	if err != nil {
 		return err
+	}
+	if result.RowsAffected == 0 {
+		return gorm.ErrRecordNotFound
 	}
 	return err
 }
@@ -1258,23 +1269,32 @@ func DecreaseUserQuota(id int, quota int, db bool) (err error) {
 	if quota < 0 {
 		return errors.New("quota 不能为负数！")
 	}
-	gopool.Go(func() {
-		err := cacheDecrUserQuota(id, int64(quota))
-		if err != nil {
-			common.SysLog("failed to decrease user quota: " + err.Error())
-		}
-	})
-	if !db && common.BatchUpdateEnabled {
-		addNewRecord(BatchUpdateTypeUserQuota, id, -quota)
+	if quota == 0 {
 		return nil
 	}
-	return decreaseUserQuota(id, quota)
+	// Consumption must be committed immediately. Delaying a decrement in the
+	// batch queue would let concurrent requests spend the same stale balance.
+	err = decreaseUserQuota(id, quota)
+	if err == nil {
+		gopool.Go(func() {
+			if cacheErr := cacheDecrUserQuota(id, int64(quota)); cacheErr != nil {
+				common.SysLog("failed to decrease user quota: " + cacheErr.Error())
+			}
+		})
+	}
+	return err
 }
 
 func decreaseUserQuota(id int, quota int) (err error) {
-	err = DB.Model(&User{}).Where("id = ?", id).Update("quota", gorm.Expr("quota - ?", quota)).Error
+	result := DB.Model(&User{}).
+		Where("id = ? AND quota >= ?", id, quota).
+		Update("quota", gorm.Expr("quota - ?", quota))
+	err = result.Error
 	if err != nil {
 		return err
+	}
+	if result.RowsAffected == 0 {
+		return ErrInsufficientQuota
 	}
 	return err
 }
@@ -1333,21 +1353,30 @@ func updateUserUsedQuotaAndRequestCount(id int, quota int, count int) {
 	//}
 }
 
-func updateUserQuotaUsedQuotaAndRequestCount(id int, quota int, usedQuota int, requestCount int) {
+func updateUserQuotaUsedQuotaAndRequestCount(id int, quota int, usedQuota int, requestCount int) error {
 	if quota == 0 && usedQuota == 0 && requestCount == 0 {
-		return
+		return nil
 	}
 
-	err := DB.Model(&User{}).Where("id = ?", id).Updates(
+	query := DB.Model(&User{}).Where("id = ?", id)
+	if quota < 0 {
+		query = query.Where("quota >= ?", -quota)
+	}
+	result := query.Updates(
 		map[string]interface{}{
 			"quota":         gorm.Expr("quota + ?", quota),
 			"used_quota":    gorm.Expr("used_quota + ?", usedQuota),
 			"request_count": gorm.Expr("request_count + ?", requestCount),
 		},
-	).Error
-	if err != nil {
-		common.SysLog("failed to batch update user quota, used quota and request count: " + err.Error())
+	)
+	if result.Error != nil {
+		common.SysLog("failed to batch update user quota, used quota and request count: " + result.Error.Error())
+		return result.Error
 	}
+	if result.RowsAffected == 0 {
+		return ErrInsufficientQuota
+	}
+	return nil
 }
 
 func updateUserUsedQuota(id int, quota int) {
