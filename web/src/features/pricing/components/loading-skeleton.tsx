@@ -48,10 +48,10 @@ function CardContentSkeleton() {
   return (
     <div className='grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3'>
       {Array.from({ length: 9 }).map((_, i) => (
-        <div key={i} className='rounded-xl border p-5'>
+        <div key={i} className='rounded-lg border p-5'>
           <div className='flex items-start justify-between gap-3'>
             <div className='flex min-w-0 items-start gap-3'>
-              <Skeleton className='size-10 shrink-0 rounded-xl' />
+              <Skeleton className='size-10 shrink-0 rounded-lg' />
               <div className='min-w-0 flex-1 space-y-2'>
                 <Skeleton className='h-5 w-36' />
                 <Skeleton className='h-3.5 w-48' />

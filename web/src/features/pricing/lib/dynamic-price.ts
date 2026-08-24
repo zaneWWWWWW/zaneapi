@@ -29,6 +29,7 @@ import {
   type ParsedTier,
 } from './billing-expr'
 import { getDisplayGroupRatio } from './model-helpers'
+import type { SquarePricePair } from './price'
 
 type DynamicPriceOptions = {
   tokenUnit: TokenUnit
@@ -179,4 +180,46 @@ export function getDynamicPricingSummary(
       (entry) => !PRIMARY_DYNAMIC_FIELDS.has(entry.field)
     ),
   }
+}
+
+export type SquareDynamicPricePair = SquarePricePair & {
+  key: string
+  shortLabel: string
+  field: string
+}
+
+export function getSquareDynamicPricePairs(
+  model: PricingModel,
+  options: Omit<DynamicPriceOptions, 'groupRatioMultiplier'>,
+  selectedGroup?: string
+): SquareDynamicPricePair[] | null {
+  const groupRatio = getDynamicDisplayGroupRatio(model, selectedGroup)
+  const ownSummary = getDynamicPricingSummary(model, {
+    ...options,
+    groupRatioMultiplier: 1,
+  })
+  if (!ownSummary || ownSummary.isSpecialExpression) {
+    return ownSummary ? [] : null
+  }
+
+  const groupedSummary = getDynamicPricingSummary(model, {
+    ...options,
+    groupRatioMultiplier: groupRatio,
+  })
+  const groupedByKey = new Map(
+    (groupedSummary?.entries ?? []).map((entry) => [entry.key, entry.formatted])
+  )
+
+  return ownSummary.entries.map((entry) => {
+    const grouped = groupedByKey.get(entry.key) ?? entry.formatted
+    return {
+      key: entry.key,
+      shortLabel: entry.shortLabel,
+      field: entry.field,
+      own: entry.formatted,
+      grouped,
+      groupRatio,
+      differs: groupRatio !== 1 && grouped !== entry.formatted,
+    }
+  })
 }

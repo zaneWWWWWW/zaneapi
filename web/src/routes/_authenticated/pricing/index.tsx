@@ -19,11 +19,11 @@ For commercial licensing, please contact support@quantumnous.com
 import { createFileRoute, redirect } from '@tanstack/react-router'
 import z from 'zod'
 
-import { ModelDetails } from '@/features/pricing/components/model-details'
+import { Pricing } from '@/features/pricing'
 import { getFreshModuleAccess } from '@/lib/nav-modules'
 import { useAuthStore } from '@/stores/auth-store'
 
-const modelDetailsSearchSchema = z.object({
+const pricingSearchSchema = z.object({
   search: z.string().optional(),
   sort: z.string().optional(),
   vendor: z.string().optional(),
@@ -36,8 +36,8 @@ const modelDetailsSearchSchema = z.object({
   rechargePrice: z.boolean().optional(),
 })
 
-export const Route = createFileRoute('/pricing/$modelId/')({
-  validateSearch: modelDetailsSearchSchema,
+export const Route = createFileRoute('/_authenticated/pricing/')({
+  validateSearch: pricingSearchSchema,
   beforeLoad: async ({ location }) => {
     const access = await getFreshModuleAccess('pricing')
     if (!access.enabled) {
@@ -53,5 +53,5 @@ export const Route = createFileRoute('/pricing/$modelId/')({
       }
     }
   },
-  component: ModelDetails,
+  component: Pricing,
 })

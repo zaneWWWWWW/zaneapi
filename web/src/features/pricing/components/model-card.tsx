@@ -26,15 +26,19 @@ import { cn } from '@/lib/utils'
 
 import { DEFAULT_TOKEN_UNIT } from '../constants'
 import {
-  getDynamicDisplayGroupRatio,
   getDynamicPricingSummary,
+  getSquareDynamicPricePairs,
 } from '../lib/dynamic-price'
 import { parseTags } from '../lib/filters'
 import { isTokenBasedModel } from '../lib/model-helpers'
-import { formatPrice, formatRequestPrice } from '../lib/price'
+import {
+  getSquareRequestPricePair,
+  getSquareTokenPricePair,
+} from '../lib/price'
 import type { PricingModel, TokenUnit } from '../types'
 import { ModelBillingModeBadge } from './model-billing-mode-badge'
 import { ModelPerfBadge, type ModelPerfBadgeData } from './model-perf-badge'
+import { SquarePricePairView } from './square-price-pair'
 
 export interface ModelCardProps {
   model: PricingModel
@@ -72,12 +76,24 @@ export const ModelCard = memo(function ModelCard(props: ModelCardProps) {
         showRechargePrice,
         priceRate,
         usdExchangeRate,
-        groupRatioMultiplier: getDynamicDisplayGroupRatio(
-          props.model,
-          props.selectedGroup
-        ),
+        groupRatioMultiplier: 1,
       })
     : null
+  const dynamicPairs = isDynamicPricing
+    ? getSquareDynamicPricePairs(
+        props.model,
+        {
+          tokenUnit,
+          showRechargePrice,
+          priceRate,
+          usdExchangeRate,
+        },
+        props.selectedGroup
+      )
+    : null
+  const primaryDynamicPairs = (dynamicPairs ?? []).filter(
+    (entry) => entry.field === 'inputPrice' || entry.field === 'outputPrice'
+  )
 
   const primaryGroup = groups[0]
   const bottomTags = [...endpoints.slice(0, 2), ...tags.slice(0, 2)]
@@ -104,18 +120,21 @@ export const ModelCard = memo(function ModelCard(props: ModelCardProps) {
           </code>
         </span>
       )
-    } else if (dynamicSummary.primaryEntries.length > 0) {
+    } else if (primaryDynamicPairs.length > 0) {
       priceSummary = (
         <>
-          {dynamicSummary.primaryEntries.map((entry) => (
+          {primaryDynamicPairs.map((entry) => (
             <span
               key={entry.key}
-              className='text-muted-foreground whitespace-nowrap'
+              className='text-muted-foreground flex flex-wrap items-start gap-x-1'
             >
-              {t(entry.shortLabel)}{' '}
-              <span className='text-foreground font-mono font-semibold'>
-                {entry.formatted}
-              </span>
+              {t(entry.shortLabel)}
+              <SquarePricePairView
+                own={entry.own}
+                grouped={entry.grouped}
+                groupRatio={entry.groupRatio}
+                differs={entry.differs}
+              />
             </span>
           ))}
         </>
@@ -130,10 +149,10 @@ export const ModelCard = memo(function ModelCard(props: ModelCardProps) {
   } else if (isTokenBased) {
     priceSummary = (
       <>
-        <span className='text-muted-foreground whitespace-nowrap'>
-          {t('Input')}{' '}
-          <span className='text-foreground font-mono font-semibold'>
-            {formatPrice(
+        <span className='text-muted-foreground flex flex-wrap items-start gap-x-1'>
+          {t('Input')}
+          <SquarePricePairView
+            {...getSquareTokenPricePair(
               props.model,
               'input',
               tokenUnit,
@@ -142,12 +161,12 @@ export const ModelCard = memo(function ModelCard(props: ModelCardProps) {
               usdExchangeRate,
               props.selectedGroup
             )}
-          </span>
+          />
         </span>
-        <span className='text-muted-foreground whitespace-nowrap'>
-          {t('Output')}{' '}
-          <span className='text-foreground font-mono font-semibold'>
-            {formatPrice(
+        <span className='text-muted-foreground flex flex-wrap items-start gap-x-1'>
+          {t('Output')}
+          <SquarePricePairView
+            {...getSquareTokenPricePair(
               props.model,
               'output',
               tokenUnit,
@@ -156,13 +175,13 @@ export const ModelCard = memo(function ModelCard(props: ModelCardProps) {
               usdExchangeRate,
               props.selectedGroup
             )}
-          </span>
+          />
         </span>
         {hasCachedPrice && (
-          <span className='text-muted-foreground whitespace-nowrap'>
-            {t('Cached')}{' '}
-            <span className='text-foreground font-mono font-semibold'>
-              {formatPrice(
+          <span className='text-muted-foreground flex flex-wrap items-start gap-x-1'>
+            {t('Cached')}
+            <SquarePricePairView
+              {...getSquareTokenPricePair(
                 props.model,
                 'cache',
                 tokenUnit,
@@ -171,23 +190,23 @@ export const ModelCard = memo(function ModelCard(props: ModelCardProps) {
                 usdExchangeRate,
                 props.selectedGroup
               )}
-            </span>
+            />
           </span>
         )}
       </>
     )
   } else {
     priceSummary = (
-      <span className='text-muted-foreground whitespace-nowrap'>
-        <span className='text-foreground font-mono font-semibold'>
-          {formatRequestPrice(
+      <span className='text-muted-foreground flex flex-wrap items-baseline gap-x-1 whitespace-nowrap'>
+        <SquarePricePairView
+          {...getSquareRequestPricePair(
             props.model,
             showRechargePrice,
             priceRate,
             usdExchangeRate,
             props.selectedGroup
           )}
-        </span>{' '}
+        />
         / {t('request')}
       </span>
     )
@@ -196,14 +215,14 @@ export const ModelCard = memo(function ModelCard(props: ModelCardProps) {
   return (
     <div
       className={cn(
-        'group relative flex flex-col rounded-xl border p-3 transition-colors sm:p-5',
+        'group relative flex flex-col rounded-lg border p-3 transition-colors sm:p-5',
         'hover:bg-muted/20'
       )}
     >
       {/* Header: icon + name + price + actions */}
       <div className='flex items-start justify-between gap-2.5 sm:gap-3'>
         <div className='flex min-w-0 items-start gap-2.5 sm:gap-3'>
-          <div className='bg-muted/40 flex size-9 shrink-0 items-center justify-center rounded-lg sm:size-10 sm:rounded-xl'>
+          <div className='bg-muted/40 flex size-9 shrink-0 items-center justify-center rounded-lg sm:size-10'>
             {modelIcon || (
               <span className='text-muted-foreground text-sm font-bold'>
                 {initial}

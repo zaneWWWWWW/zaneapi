@@ -65,19 +65,20 @@ describe('legacy frontend route migration', () => {
       chats: '/system-settings/content/chat',
       drawing: '/system-settings/content/drawing',
       payment: '/system-settings/billing/payment',
-      ratio: '/system-settings/billing/model-pricing',
+      ratio: '/models/metadata?view=prices',
       ratelimit: '/system-settings/security/rate-limit',
       models: '/system-settings/models/global',
-      'model-deployment': '/system-settings/models/model-deployment',
+      'model-deployment': '/models/deployments',
       performance: '/system-settings/operations/performance',
       system: '/system-settings/site/system-info',
       other: '/system-settings/site/system-info',
     }
 
     for (const [tab, target] of Object.entries(settingsTabs)) {
+      const separator = target.includes('?') ? '&' : '?'
       assert.equal(
         resolveLegacyRoute(`/console/setting?tab=${tab}&from=bookmark#form`),
-        `${target}?tab=${tab}&from=bookmark#form`
+        `${target}${separator}tab=${tab}&from=bookmark#form`
       )
     }
     assert.equal(

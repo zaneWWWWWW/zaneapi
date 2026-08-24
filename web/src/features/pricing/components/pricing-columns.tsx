@@ -30,18 +30,19 @@ import { getLobeIcon } from '@/lib/lobe-icon'
 
 import { DEFAULT_TOKEN_UNIT } from '../constants'
 import {
-  getDynamicDisplayGroupRatio,
   getDynamicPricingSummary,
+  getSquareDynamicPricePairs,
 } from '../lib/dynamic-price'
 import { parseTags } from '../lib/filters'
 import { isTokenBasedModel } from '../lib/model-helpers'
 import {
-  formatPrice,
-  formatRequestPrice,
+  getSquareRequestPricePair,
+  getSquareTokenPricePair,
   stripTrailingZeros,
 } from '../lib/price'
 import type { PricingModel, TokenUnit } from '../types'
 import { ModelBillingModeBadge } from './model-billing-mode-badge'
+import { SquarePricePairView } from './square-price-pair'
 
 // ----------------------------------------------------------------------------
 // Pricing Table Columns
@@ -119,11 +120,18 @@ export function usePricingColumns(
           showRechargePrice,
           priceRate,
           usdExchangeRate,
-          groupRatioMultiplier: getDynamicDisplayGroupRatio(
-            model,
-            selectedGroup
-          ),
+          groupRatioMultiplier: 1,
         })
+        const dynamicPairs = getSquareDynamicPricePairs(
+          model,
+          {
+            tokenUnit,
+            showRechargePrice,
+            priceRate,
+            usdExchangeRate,
+          },
+          selectedGroup
+        )
 
         if (dynamicSummary) {
           if (dynamicSummary.isSpecialExpression) {
@@ -142,8 +150,13 @@ export function usePricingColumns(
             )
           }
 
-          const primaryEntries = dynamicSummary.primaryEntries.slice(0, 2)
-          if (primaryEntries.length === 0) {
+          const primaryPairs = (dynamicPairs ?? [])
+            .filter(
+              (entry) =>
+                entry.field === 'inputPrice' || entry.field === 'outputPrice'
+            )
+            .slice(0, 2)
+          if (primaryPairs.length === 0) {
             return (
               <span className='text-muted-foreground text-xs'>
                 {t('Dynamic Pricing')}
@@ -153,16 +166,18 @@ export function usePricingColumns(
 
           return (
             <div className='max-w-full min-w-0'>
-              <span className='font-mono text-sm tabular-nums'>
-                {primaryEntries.map((entry, index) => (
-                  <span key={entry.key}>
-                    {index > 0 && (
-                      <span className='text-muted-foreground/40 mx-1'>/</span>
-                    )}
-                    {stripTrailingZeros(entry.formatted)}
-                  </span>
+              <div className='flex flex-wrap items-start gap-x-2 gap-y-1'>
+                {primaryPairs.map((entry) => (
+                  <SquarePricePairView
+                    key={entry.key}
+                    own={stripTrailingZeros(entry.own)}
+                    grouped={stripTrailingZeros(entry.grouped)}
+                    groupRatio={entry.groupRatio}
+                    differs={entry.differs}
+                    align='end'
+                  />
                 ))}
-              </span>
+              </div>
               <div className='text-muted-foreground/50 text-[10px]'>
                 / {tokenUnitLabel} tokens
                 {dynamicSummary.tierCount > 1 &&
@@ -177,36 +192,41 @@ export function usePricingColumns(
         const isTokenBased = isTokenBasedModel(model)
 
         if (isTokenBased) {
-          const inputPrice = stripTrailingZeros(
-            formatPrice(
-              model,
-              'input',
-              tokenUnit,
-              showRechargePrice,
-              priceRate,
-              usdExchangeRate,
-              selectedGroup
-            )
+          const inputPrice = getSquareTokenPricePair(
+            model,
+            'input',
+            tokenUnit,
+            showRechargePrice,
+            priceRate,
+            usdExchangeRate,
+            selectedGroup
           )
-          const outputPrice = stripTrailingZeros(
-            formatPrice(
-              model,
-              'output',
-              tokenUnit,
-              showRechargePrice,
-              priceRate,
-              usdExchangeRate,
-              selectedGroup
-            )
+          const outputPrice = getSquareTokenPricePair(
+            model,
+            'output',
+            tokenUnit,
+            showRechargePrice,
+            priceRate,
+            usdExchangeRate,
+            selectedGroup
           )
 
           return (
             <div className='max-w-full min-w-0'>
-              <span className='font-mono text-sm tabular-nums'>
-                {inputPrice}
-                <span className='text-muted-foreground/40 mx-1'>/</span>
-                {outputPrice}
-              </span>
+              <div className='flex flex-wrap items-start gap-x-2 gap-y-1'>
+                <SquarePricePairView
+                  {...inputPrice}
+                  own={stripTrailingZeros(inputPrice.own)}
+                  grouped={stripTrailingZeros(inputPrice.grouped)}
+                  align='end'
+                />
+                <SquarePricePairView
+                  {...outputPrice}
+                  own={stripTrailingZeros(outputPrice.own)}
+                  grouped={stripTrailingZeros(outputPrice.grouped)}
+                  align='end'
+                />
+              </div>
               <div className='text-muted-foreground/50 text-[10px]'>
                 / {tokenUnitLabel} tokens
               </div>
@@ -214,19 +234,22 @@ export function usePricingColumns(
           )
         }
 
-        const price = stripTrailingZeros(
-          formatRequestPrice(
-            model,
-            showRechargePrice,
-            priceRate,
-            usdExchangeRate,
-            selectedGroup
-          )
+        const price = getSquareRequestPricePair(
+          model,
+          showRechargePrice,
+          priceRate,
+          usdExchangeRate,
+          selectedGroup
         )
 
         return (
           <div className='max-w-full min-w-0'>
-            <span className='font-mono text-sm tabular-nums'>{price}</span>
+            <SquarePricePairView
+              {...price}
+              own={stripTrailingZeros(price.own)}
+              grouped={stripTrailingZeros(price.grouped)}
+              align='end'
+            />
             <div className='text-muted-foreground/50 text-[10px]'>
               / {t('request')}
             </div>
@@ -248,11 +271,18 @@ export function usePricingColumns(
           showRechargePrice,
           priceRate,
           usdExchangeRate,
-          groupRatioMultiplier: getDynamicDisplayGroupRatio(
-            model,
-            selectedGroup
-          ),
+          groupRatioMultiplier: 1,
         })
+        const dynamicPairs = getSquareDynamicPricePairs(
+          model,
+          {
+            tokenUnit,
+            showRechargePrice,
+            priceRate,
+            usdExchangeRate,
+          },
+          selectedGroup
+        )
 
         if (dynamicSummary) {
           if (dynamicSummary.isSpecialExpression) {
@@ -263,7 +293,7 @@ export function usePricingColumns(
             )
           }
 
-          const cacheEntry = dynamicSummary.entries.find(
+          const cacheEntry = (dynamicPairs ?? []).find(
             (entry) => entry.field === 'cacheReadPrice'
           )
           if (!cacheEntry) {
@@ -272,9 +302,13 @@ export function usePricingColumns(
 
           return (
             <div className='max-w-full min-w-0'>
-              <span className='font-mono text-sm tabular-nums'>
-                {stripTrailingZeros(cacheEntry.formatted)}
-              </span>
+              <SquarePricePairView
+                own={stripTrailingZeros(cacheEntry.own)}
+                grouped={stripTrailingZeros(cacheEntry.grouped)}
+                groupRatio={cacheEntry.groupRatio}
+                differs={cacheEntry.differs}
+                align='end'
+              />
               <div className='text-muted-foreground/50 text-[10px]'>
                 / {tokenUnitLabel}
               </div>
@@ -288,23 +322,24 @@ export function usePricingColumns(
           return <span className='text-muted-foreground/30 text-xs'>—</span>
         }
 
-        const cachedPrice = stripTrailingZeros(
-          formatPrice(
-            model,
-            'cache',
-            tokenUnit,
-            showRechargePrice,
-            priceRate,
-            usdExchangeRate,
-            selectedGroup
-          )
+        const cachedPrice = getSquareTokenPricePair(
+          model,
+          'cache',
+          tokenUnit,
+          showRechargePrice,
+          priceRate,
+          usdExchangeRate,
+          selectedGroup
         )
 
         return (
           <div className='max-w-full min-w-0'>
-            <span className='font-mono text-sm tabular-nums'>
-              {cachedPrice}
-            </span>
+            <SquarePricePairView
+              {...cachedPrice}
+              own={stripTrailingZeros(cachedPrice.own)}
+              grouped={stripTrailingZeros(cachedPrice.grouped)}
+              align='end'
+            />
             <div className='text-muted-foreground/50 text-[10px]'>
               / {tokenUnitLabel}
             </div>

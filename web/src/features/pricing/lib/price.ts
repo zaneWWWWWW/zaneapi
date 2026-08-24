@@ -102,6 +102,121 @@ function hasRatio(value: number | null | undefined): boolean {
   return value !== undefined && value !== null && Number.isFinite(Number(value))
 }
 
+export type SquarePricePair = {
+  own: string
+  grouped: string
+  groupRatio: number
+  differs: boolean
+}
+
+export function formatSquareGroupRatio(ratio: number): string {
+  if (!Number.isFinite(ratio)) return '1'
+  return Number(ratio.toPrecision(6)).toString()
+}
+
+function formatTokenAmount(
+  priceInUSD: number,
+  tokenUnit: TokenUnit,
+  showWithRecharge: boolean,
+  priceRate: number,
+  usdExchangeRate: number
+): string {
+  const converted = applyRechargeRate(
+    priceInUSD,
+    showWithRecharge,
+    priceRate,
+    usdExchangeRate
+  )
+  return formatCurrencyFromUSD(converted / TOKEN_UNIT_DIVISORS[tokenUnit], {
+    digitsLarge: 4,
+    digitsSmall: 6,
+    abbreviate: false,
+  })
+}
+
+function formatRequestAmount(
+  priceInUSD: number,
+  showWithRecharge: boolean,
+  priceRate: number,
+  usdExchangeRate: number
+): string {
+  const converted = applyRechargeRate(
+    priceInUSD,
+    showWithRecharge,
+    priceRate,
+    usdExchangeRate
+  )
+  return formatCurrencyFromUSD(converted, {
+    digitsLarge: 4,
+    digitsSmall: 4,
+    abbreviate: false,
+  })
+}
+
+function toSquarePricePair(
+  own: string,
+  grouped: string,
+  groupRatio: number
+): SquarePricePair {
+  return {
+    own,
+    grouped,
+    groupRatio,
+    differs: groupRatio !== 1 && own !== grouped,
+  }
+}
+
+export function getSquareTokenPricePair(
+  model: PricingModel,
+  type: PriceType,
+  tokenUnit: TokenUnit,
+  showWithRecharge = false,
+  priceRate = 1,
+  usdExchangeRate = 1,
+  selectedGroup?: string
+): SquarePricePair {
+  const groupRatio = getDisplayGroupRatio(model, selectedGroup)
+  const own = formatTokenAmount(
+    calculateTokenPrice(model, type, 1),
+    tokenUnit,
+    showWithRecharge,
+    priceRate,
+    usdExchangeRate
+  )
+  const grouped = formatTokenAmount(
+    calculateTokenPrice(model, type, groupRatio),
+    tokenUnit,
+    showWithRecharge,
+    priceRate,
+    usdExchangeRate
+  )
+  return toSquarePricePair(own, grouped, groupRatio)
+}
+
+export function getSquareRequestPricePair(
+  model: PricingModel,
+  showWithRecharge = false,
+  priceRate = 1,
+  usdExchangeRate = 1,
+  selectedGroup?: string
+): SquarePricePair {
+  const groupRatio = getDisplayGroupRatio(model, selectedGroup)
+  const base = model.model_price || 0
+  const own = formatRequestAmount(
+    base,
+    showWithRecharge,
+    priceRate,
+    usdExchangeRate
+  )
+  const grouped = formatRequestAmount(
+    base * groupRatio,
+    showWithRecharge,
+    priceRate,
+    usdExchangeRate
+  )
+  return toSquarePricePair(own, grouped, groupRatio)
+}
+
 /**
  * Apply recharge rate to price
  *
@@ -154,22 +269,15 @@ export function formatPrice(
     return '-'
   }
 
-  const displayGroupRatio = getDisplayGroupRatio(model, selectedGroup)
-
-  let priceInUSD = calculateTokenPrice(model, type, displayGroupRatio)
-  priceInUSD = applyRechargeRate(
-    priceInUSD,
+  return getSquareTokenPricePair(
+    model,
+    type,
+    tokenUnit,
     showWithRecharge,
     priceRate,
-    usdExchangeRate
-  )
-
-  const price = priceInUSD / TOKEN_UNIT_DIVISORS[tokenUnit]
-  return formatCurrencyFromUSD(price, {
-    digitsLarge: 4,
-    digitsSmall: 6,
-    abbreviate: false,
-  })
+    usdExchangeRate,
+    selectedGroup
+  ).grouped
 }
 
 /**
@@ -253,20 +361,11 @@ export function formatRequestPrice(
     return '-'
   }
 
-  const displayGroupRatio = getDisplayGroupRatio(model, selectedGroup)
-
-  let priceInUSD = (model.model_price || 0) * displayGroupRatio
-
-  priceInUSD = applyRechargeRate(
-    priceInUSD,
+  return getSquareRequestPricePair(
+    model,
     showWithRecharge,
     priceRate,
-    usdExchangeRate
-  )
-
-  return formatCurrencyFromUSD(priceInUSD, {
-    digitsLarge: 4,
-    digitsSmall: 4,
-    abbreviate: false,
-  })
+    usdExchangeRate,
+    selectedGroup
+  ).grouped
 }
