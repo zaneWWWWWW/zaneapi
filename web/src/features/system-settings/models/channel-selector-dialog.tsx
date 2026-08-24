@@ -17,10 +17,11 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 For commercial licensing, please contact support@quantumnous.com
 */
 import type { ColumnDef, RowSelectionState } from '@tanstack/react-table'
-import { Search } from 'lucide-react'
+import { Search, Trash2 } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
+import { ConfirmDialog } from '@/components/confirm-dialog'
 import {
   DataTablePagination,
   DataTableView,
@@ -47,7 +48,14 @@ import {
   ENDPOINT_OPTIONS,
   MODELS_DEV_PRESET_ID,
   OFFICIAL_CHANNEL_ID,
+  PRICEAPPLE_PRESET_ID,
 } from './constants'
+import {
+  filterVisibleSyncChannels,
+  hideSyncChannelId,
+  loadHiddenSyncChannelIds,
+  saveHiddenSyncChannelIds,
+} from './hidden-sync-channels'
 
 type ChannelSelectorDialogProps = {
   open: boolean
@@ -64,7 +72,9 @@ type ChannelSelectorDialogProps = {
 // negative IDs, so matching by ID alone is reliable and self-documenting.
 function isOfficialChannel(channel: UpstreamChannel): boolean {
   return (
-    channel.id === OFFICIAL_CHANNEL_ID || channel.id === MODELS_DEV_PRESET_ID
+    channel.id === OFFICIAL_CHANNEL_ID ||
+    channel.id === MODELS_DEV_PRESET_ID ||
+    channel.id === PRICEAPPLE_PRESET_ID
   )
 }
 
@@ -81,6 +91,9 @@ export function ChannelSelectorDialog({
   const { t } = useTranslation()
   const [search, setSearch] = useState('')
   const [rowSelection, setRowSelection] = useState<RowSelectionState>({})
+  const [hiddenIds, setHiddenIds] = useState<number[]>(loadHiddenSyncChannelIds)
+  const [channelPendingRemoval, setChannelPendingRemoval] =
+    useState<UpstreamChannel | null>(null)
 
   useEffect(() => {
     if (!selectedChannelIds.length) {
@@ -114,6 +127,27 @@ export function ChannelSelectorDialog({
     const option = ENDPOINT_OPTIONS.find((opt) => opt.value === endpoint)
     return option ? endpoint : 'custom'
   }
+
+  const persistHiddenIds = useCallback((ids: number[]) => {
+    setHiddenIds(ids)
+    saveHiddenSyncChannelIds(ids)
+  }, [])
+
+  const handleConfirmRemove = useCallback(() => {
+    if (!channelPendingRemoval) return
+    const nextHidden = hideSyncChannelId(hiddenIds, channelPendingRemoval.id)
+    persistHiddenIds(nextHidden)
+    setRowSelection((prev) => {
+      const next = { ...prev }
+      delete next[channelPendingRemoval.id.toString()]
+      return next
+    })
+    setChannelPendingRemoval(null)
+  }, [channelPendingRemoval, hiddenIds, persistHiddenIds])
+
+  const handleRestoreHidden = useCallback(() => {
+    persistHiddenIds([])
+  }, [persistHiddenIds])
 
   const columns = useMemo<ColumnDef<UpstreamChannel>[]>(
     () => [
@@ -268,20 +302,50 @@ export function ChannelSelectorDialog({
           )
         },
       },
+      {
+        id: 'actions',
+        header: t('Actions'),
+        size: 72,
+        minSize: 64,
+        enableSorting: false,
+        cell: ({ row }) => {
+          const channel = row.original
+          return (
+            <Button
+              type='button'
+              variant='ghost'
+              size='icon'
+              className='text-muted-foreground hover:text-destructive'
+              aria-label={t('Remove {{name}}', { name: channel.name })}
+              onClick={(event) => {
+                event.stopPropagation()
+                setChannelPendingRemoval(channel)
+              }}
+            >
+              <Trash2 className='h-4 w-4' />
+            </Button>
+          )
+        },
+      },
     ],
     [channelEndpoints, t, updateEndpoint]
   )
 
+  const visibleChannels = useMemo(
+    () => filterVisibleSyncChannels(channels, hiddenIds),
+    [channels, hiddenIds]
+  )
+
   const filteredChannels = useMemo(() => {
-    if (!search.trim()) return channels
+    if (!search.trim()) return visibleChannels
 
     const searchLower = search.toLowerCase()
-    return channels.filter(
+    return visibleChannels.filter(
       (ch) =>
         ch.name.toLowerCase().includes(searchLower) ||
         ch.base_url.toLowerCase().includes(searchLower)
     )
-  }, [channels, search])
+  }, [visibleChannels, search])
 
   const sortedChannels = useMemo(() => {
     return [...filteredChannels].sort((a, b) => {
@@ -314,61 +378,89 @@ export function ChannelSelectorDialog({
   }
 
   return (
-    <Dialog
-      open={open}
-      onOpenChange={onOpenChange}
-      title={t('Select Sync Channels')}
-      description={t(
-        'Choose channels to sync upstream ratio configurations from'
-      )}
-      contentClassName='flex max-h-[90vh] max-w-[calc(100%-2rem)] flex-col sm:max-w-[90vw] xl:max-w-[1400px]'
-      contentHeight='min(72vh, 720px)'
-      bodyClassName='flex h-full min-h-0 flex-col overflow-hidden'
-      footer={
-        <>
-          <Button variant='outline' onClick={() => onOpenChange(false)}>
-            {t('Cancel')}
-          </Button>
-          <Button onClick={handleConfirm}>{t('Confirm Selection')}</Button>
-        </>
-      }
-    >
-      <div className='flex h-full min-h-0 flex-col gap-4 overflow-hidden'>
-        <div className='flex shrink-0 items-center gap-2'>
-          <div className='relative flex-1'>
-            <Search className='text-muted-foreground pointer-events-none absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2' />
-            <Input
-              placeholder={t('Search by name or URL...')}
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              className='ps-9'
-            />
+    <>
+      <Dialog
+        open={open}
+        onOpenChange={onOpenChange}
+        title={t('Select Sync Channels')}
+        description={t(
+          'Choose channels to sync upstream ratio configurations from'
+        )}
+        contentClassName='flex max-h-[90vh] max-w-[calc(100%-2rem)] flex-col sm:max-w-[90vw] xl:max-w-[1400px]'
+        contentHeight='min(72vh, 720px)'
+        bodyClassName='flex h-full min-h-0 flex-col overflow-hidden'
+        footer={
+          <>
+            <Button variant='outline' onClick={() => onOpenChange(false)}>
+              {t('Cancel')}
+            </Button>
+            <Button onClick={handleConfirm}>{t('Confirm Selection')}</Button>
+          </>
+        }
+      >
+        <div className='flex h-full min-h-0 flex-col gap-4 overflow-hidden'>
+          <div className='flex shrink-0 items-center gap-2'>
+            <div className='relative flex-1'>
+              <Search className='text-muted-foreground pointer-events-none absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2' />
+              <Input
+                placeholder={t('Search by name or URL...')}
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                className='ps-9'
+              />
+            </div>
+            {hiddenIds.length > 0 && (
+              <Button
+                type='button'
+                variant='outline'
+                onClick={handleRestoreHidden}
+              >
+                {t('Restore hidden sources ({{count}})', {
+                  count: hiddenIds.length,
+                })}
+              </Button>
+            )}
+          </div>
+
+          <DataTableView
+            table={table}
+            containerClassName='min-h-0 flex-1 rounded-md'
+            tableContainerClassName='h-full min-h-0'
+            tableHeaderClassName='[background-color:var(--table-header)]'
+            splitHeaderScrollClassName='h-full'
+            bodyContainerClassName='[scrollbar-gutter:stable]'
+            splitHeader
+            getColumnClassName={(columnId, part) => {
+              if (columnId === 'select') return 'w-11 text-center align-middle'
+              if (columnId === 'actions') return 'w-16 text-center align-middle'
+              if (columnId === 'status') {
+                return part === 'header' ? 'h-11 align-middle' : 'align-middle'
+              }
+              return part === 'header' ? 'h-11 align-middle' : 'align-middle'
+            }}
+            emptyContent={t('No channels found')}
+            emptyCellClassName='h-24 text-center'
+          />
+
+          <div className='shrink-0'>
+            <DataTablePagination table={table} />
           </div>
         </div>
-
-        <DataTableView
-          table={table}
-          containerClassName='min-h-0 flex-1 rounded-md'
-          tableContainerClassName='h-full min-h-0'
-          tableHeaderClassName='[background-color:var(--table-header)]'
-          splitHeaderScrollClassName='h-full'
-          bodyContainerClassName='[scrollbar-gutter:stable]'
-          splitHeader
-          getColumnClassName={(columnId, part) => {
-            if (columnId === 'select') return 'w-11 text-center align-middle'
-            if (columnId === 'status') {
-              return part === 'header' ? 'h-11 align-middle' : 'align-middle'
-            }
-            return part === 'header' ? 'h-11 align-middle' : 'align-middle'
-          }}
-          emptyContent={t('No channels found')}
-          emptyCellClassName='h-24 text-center'
-        />
-
-        <div className='shrink-0'>
-          <DataTablePagination table={table} />
-        </div>
-      </div>
-    </Dialog>
+      </Dialog>
+      <ConfirmDialog
+        open={channelPendingRemoval !== null}
+        onOpenChange={(nextOpen) => {
+          if (!nextOpen) setChannelPendingRemoval(null)
+        }}
+        title={t('Remove sync source')}
+        desc={t(
+          'Hide {{name}} from this list? Official presets can be restored. Regular channels are only hidden here and are not deleted.',
+          { name: channelPendingRemoval?.name ?? '' }
+        )}
+        confirmText={t('Remove')}
+        destructive
+        handleConfirm={handleConfirmRemove}
+      />
+    </>
   )
 }
