@@ -144,6 +144,14 @@ func GetToolPrice(toolName string) float64 {
 	return GetToolPriceForModel(toolName, "")
 }
 
+func GetToolPricesCopy() map[string]float64 {
+	copied := make(map[string]float64, len(toolPriceSetting.Prices))
+	for key, value := range toolPriceSetting.Prices {
+		copied[key] = value
+	}
+	return copied
+}
+
 // ---------------------------------------------------------------------------
 // GPT Image 1 per-call pricing (special: depends on quality + size)
 // ---------------------------------------------------------------------------

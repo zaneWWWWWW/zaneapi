@@ -25,13 +25,16 @@ import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 
 import {
+  applyPriceAppleExtras,
   fetchUpstreamRatios,
   getUpstreamChannels,
   updateSystemOption,
 } from '../api'
 import type {
+  CatalogDifference,
   DifferencesMap,
   RatioType,
+  ToolPriceDifference,
   UpstreamChannel,
   UpstreamConfig,
 } from '../types'
@@ -48,6 +51,8 @@ import {
   OFFICIAL_CHANNEL_ID,
   OPENROUTER_CHANNEL_TYPE,
   OPENROUTER_ENDPOINT,
+  PRICEAPPLE_PRESET_ENDPOINT,
+  PRICEAPPLE_PRESET_ID,
 } from './constants'
 import {
   NUMERIC_SYNC_FIELDS,
@@ -91,8 +96,25 @@ type UpstreamRatioSyncProps = {
 function getDefaultEndpointForChannel(channel: UpstreamChannel): string {
   if (channel.id === MODELS_DEV_PRESET_ID) return MODELS_DEV_PRESET_ENDPOINT
   if (channel.id === OFFICIAL_CHANNEL_ID) return OFFICIAL_CHANNEL_ENDPOINT
+  if (channel.id === PRICEAPPLE_PRESET_ID) return PRICEAPPLE_PRESET_ENDPOINT
   if (channel.type === OPENROUTER_CHANNEL_TYPE) return OPENROUTER_ENDPOINT
   return DEFAULT_ENDPOINT
+}
+
+function autoSelectSingleSource(diffs: DifferencesMap): ResolutionsMap {
+  const next: ResolutionsMap = {}
+  for (const [model, fields] of Object.entries(diffs)) {
+    for (const [ratioType, item] of Object.entries(fields)) {
+      if (!item?.upstreams) continue
+      const values = Object.entries(item.upstreams).filter(
+        ([, value]) => value !== 'same' && value != null
+      )
+      if (values.length !== 1) continue
+      if (!next[model]) next[model] = {}
+      next[model][ratioType] = values[0][1] as number | string
+    }
+  }
+  return next
 }
 
 function optionKeyBySyncField(ratioType: string): string {
@@ -131,6 +153,12 @@ export function UpstreamRatioSync({ modelRatios }: UpstreamRatioSyncProps) {
   >({})
   const [differences, setDifferences] = useState<DifferencesMap>({})
   const [resolutions, setResolutions] = useState<ResolutionsMap>({})
+  const [catalogDifferences, setCatalogDifferences] = useState<
+    CatalogDifference[]
+  >([])
+  const [toolPriceDifferences, setToolPriceDifferences] = useState<
+    ToolPriceDifference[]
+  >([])
   const [conflictItems, setConflictItems] = useState<ConflictItem[]>([])
   const [confirmLoading, setConfirmLoading] = useState(false)
 
@@ -168,7 +196,12 @@ export function UpstreamRatioSync({ modelRatios }: UpstreamRatioSyncProps) {
         return
       }
 
-      const { differences: diffs, test_results } = data.data
+      const {
+        differences: diffs,
+        test_results,
+        catalog_differences,
+        tool_price_differences,
+      } = data.data
 
       const errorResults = test_results.filter((r) => r.status === 'error')
       if (errorResults.length > 0) {
@@ -179,7 +212,9 @@ export function UpstreamRatioSync({ modelRatios }: UpstreamRatioSyncProps) {
       }
 
       setDifferences(diffs)
-      setResolutions({})
+      setCatalogDifferences(catalog_differences ?? [])
+      setToolPriceDifferences(tool_price_differences ?? [])
+      setResolutions(autoSelectSingleSource(diffs))
 
       if (Object.keys(diffs).length === 0) {
         toast.success(t('No price differences found'))
@@ -331,6 +366,34 @@ export function UpstreamRatioSync({ modelRatios }: UpstreamRatioSyncProps) {
     return null
   }
 
+  const applyFetchedExtras = useCallback(async (): Promise<boolean> => {
+    if (
+      catalogDifferences.length === 0 &&
+      toolPriceDifferences.length === 0
+    ) {
+      return true
+    }
+    const toolPrices: Record<string, number> = {}
+    for (const item of toolPriceDifferences) {
+      toolPrices[item.key] = item.upstream
+    }
+    const extra = await applyPriceAppleExtras({
+      catalog: catalogDifferences.map((item) => ({
+        model_name: item.model_name,
+        provider: item.provider,
+        enabled: item.enabled,
+      })),
+      tool_prices: toolPrices,
+    })
+    if (!extra.success) {
+      toast.error(extra.message || t('Failed to sync catalog and tool prices'))
+      return false
+    }
+    setCatalogDifferences([])
+    setToolPriceDifferences([])
+    return true
+  }, [catalogDifferences, t, toolPriceDifferences])
+
   const performSync = useCallback(
     async (currentRatios: ParsedRatios): Promise<boolean> => {
       const finalRatios: Record<string, Record<string, number | string>> = {
@@ -356,8 +419,11 @@ export function UpstreamRatioSync({ modelRatios }: UpstreamRatioSyncProps) {
         const hasRatio = selectedTypes.some((rt) =>
           RATIO_SYNC_FIELDS.includes(rt as RatioType)
         )
+        const hasTiered =
+          selectedTypes.includes('billing_expr') ||
+          selectedTypes.includes('billing_mode')
 
-        if (hasPrice) {
+        if (hasPrice || hasTiered) {
           delete finalRatios.ModelRatio[model]
           delete finalRatios.CompletionRatio[model]
           delete finalRatios.CacheRatio[model]
@@ -366,8 +432,12 @@ export function UpstreamRatioSync({ modelRatios }: UpstreamRatioSyncProps) {
           delete finalRatios.AudioRatio[model]
           delete finalRatios.AudioCompletionRatio[model]
         }
-        if (hasRatio) {
+        if (hasRatio || hasTiered) {
           delete finalRatios.ModelPrice[model]
+        }
+        if (hasPrice || hasRatio) {
+          delete finalRatios['billing_setting.billing_mode'][model]
+          delete finalRatios['billing_setting.billing_expr'][model]
         }
 
         Object.entries(ratios).forEach(([ratioType, value]) => {
@@ -378,19 +448,24 @@ export function UpstreamRatioSync({ modelRatios }: UpstreamRatioSyncProps) {
         })
       })
 
-      const updates = Object.entries(finalRatios).map(([key, value]) => ({
-        key,
-        value: JSON.stringify(value, null, 2),
-      }))
+      if (Object.keys(resolutions).length > 0) {
+        const updates = Object.entries(finalRatios).map(([key, value]) => ({
+          key,
+          value: JSON.stringify(value, null, 2),
+        }))
 
-      return new Promise<boolean>((resolve) => {
-        syncMutate(updates, {
-          onSuccess: () => resolve(true),
-          onError: () => resolve(false),
+        const pricesOk = await new Promise<boolean>((resolve) => {
+          syncMutate(updates, {
+            onSuccess: () => resolve(true),
+            onError: () => resolve(false),
+          })
         })
-      })
+        if (!pricesOk) return false
+      }
+
+      return applyFetchedExtras()
     },
-    [resolutions, syncMutate]
+    [applyFetchedExtras, resolutions, syncMutate]
   )
 
   const findSourceChannel = (
@@ -471,7 +546,10 @@ export function UpstreamRatioSync({ modelRatios }: UpstreamRatioSyncProps) {
     }
   }
 
-  const hasSelections = Object.keys(resolutions).length > 0
+  const hasSelections =
+    Object.keys(resolutions).length > 0 ||
+    catalogDifferences.length > 0 ||
+    toolPriceDifferences.length > 0
   const isLoading = fetchMutation.isPending || isSyncPending || confirmLoading
 
   return (
@@ -482,6 +560,18 @@ export function UpstreamRatioSync({ modelRatios }: UpstreamRatioSyncProps) {
             <RefreshCcw className='mr-2 h-4 w-4' />
             {t('Select Sync Channels')}
           </Button>
+          {(catalogDifferences.length > 0 ||
+            toolPriceDifferences.length > 0) && (
+            <p className='text-muted-foreground text-sm'>
+              {t(
+                '{{catalog}} catalog updates and {{tools}} tool price updates will apply together.',
+                {
+                  catalog: catalogDifferences.length,
+                  tools: toolPriceDifferences.length,
+                }
+              )}
+            </p>
+          )}
           <Button
             variant='secondary'
             onClick={handleApplySync}

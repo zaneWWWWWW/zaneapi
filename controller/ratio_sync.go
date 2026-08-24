@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"math"
@@ -22,10 +23,12 @@ import (
 	"github.com/QuantumNous/new-api/dto"
 	"github.com/QuantumNous/new-api/model"
 	"github.com/QuantumNous/new-api/setting/billing_setting"
+	"github.com/QuantumNous/new-api/setting/operation_setting"
 	"github.com/QuantumNous/new-api/setting/ratio_setting"
 	"github.com/samber/lo"
 
 	"github.com/gin-gonic/gin"
+	"gorm.io/gorm"
 )
 
 const (
@@ -40,6 +43,10 @@ const (
 	modelsDevPresetID           = -101
 	modelsDevPresetName         = "models.dev 价格预设"
 	modelsDevPresetBaseURL      = "https://models.dev"
+	priceApplePresetID          = -102
+	priceApplePresetName        = "PriceApple"
+	priceApplePresetBaseURL     = "https://priceapple.macroapple.cc"
+	priceApplePresetEndpoint    = "/api/newapi/sync"
 	modelsDevHost               = "models.dev"
 	modelsDevPath               = "/api.json"
 	modelsDevInputCostRatioBase = 1000.0
@@ -86,9 +93,11 @@ var numericPricingSyncFields = map[string]bool{
 }
 
 type upstreamResult struct {
-	Name string         `json:"name"`
-	Data map[string]any `json:"data,omitempty"`
-	Err  string         `json:"err,omitempty"`
+	Name       string                      `json:"name"`
+	Data       map[string]any              `json:"data,omitempty"`
+	Catalog    []dto.PriceAppleCatalogItem `json:"catalog,omitempty"`
+	ToolPrices map[string]float64          `json:"tool_prices,omitempty"`
+	Err        string                      `json:"err,omitempty"`
 }
 
 func valueMap(value any) map[string]any {
@@ -372,7 +381,13 @@ func FetchUpstreamRatios(c *gin.Context) {
 					}
 				}
 				if isType1 {
-					ch <- upstreamResult{Name: uniqueName, Data: type1Data}
+					catalog, toolPrices := extractSyncExtras(type1Data)
+					ch <- upstreamResult{
+						Name:       uniqueName,
+						Data:       type1Data,
+						Catalog:    catalog,
+						ToolPrices: toolPrices,
+					}
 					return
 				}
 			}
@@ -502,6 +517,8 @@ func FetchUpstreamRatios(c *gin.Context) {
 		name string
 		data map[string]any
 	}
+	catalogByName := map[string]dto.PriceAppleCatalogItem{}
+	toolPrices := map[string]float64{}
 
 	for r := range ch {
 		if r.Err != "" {
@@ -519,18 +536,124 @@ func FetchUpstreamRatios(c *gin.Context) {
 				name string
 				data map[string]any
 			}{name: r.Name, data: r.Data})
+			for _, item := range r.Catalog {
+				if strings.TrimSpace(item.ModelName) == "" {
+					continue
+				}
+				catalogByName[item.ModelName] = item
+			}
+			for key, value := range r.ToolPrices {
+				toolPrices[key] = value
+			}
 		}
 	}
 
 	differences := buildDifferences(localData, successfulChannels)
+	catalogItems := make([]dto.PriceAppleCatalogItem, 0, len(catalogByName))
+	for _, item := range catalogByName {
+		catalogItems = append(catalogItems, item)
+	}
 
 	c.JSON(http.StatusOK, gin.H{
 		"success": true,
 		"data": gin.H{
-			"differences":  differences,
-			"test_results": testResults,
+			"differences":            differences,
+			"test_results":           testResults,
+			"catalog_differences":    buildCatalogDifferences(catalogItems),
+			"tool_price_differences": buildToolPriceDifferences(toolPrices),
 		},
 	})
+}
+
+func extractSyncExtras(data map[string]any) ([]dto.PriceAppleCatalogItem, map[string]float64) {
+	var catalog []dto.PriceAppleCatalogItem
+	if raw, ok := data["catalog"]; ok {
+		encoded, err := common.Marshal(raw)
+		if err == nil {
+			_ = common.Unmarshal(encoded, &catalog)
+		}
+	}
+	toolPrices := map[string]float64{}
+	if raw, ok := data["tool_prices"]; ok {
+		encoded, err := common.Marshal(raw)
+		if err == nil {
+			_ = common.Unmarshal(encoded, &toolPrices)
+		}
+	}
+	return catalog, toolPrices
+}
+
+func buildCatalogDifferences(items []dto.PriceAppleCatalogItem) []dto.CatalogDifference {
+	if len(items) == 0 {
+		return []dto.CatalogDifference{}
+	}
+	localModels, err := model.GetAllModelMetas()
+	if err != nil {
+		common.SysLog("buildCatalogDifferences load models: " + err.Error())
+		return []dto.CatalogDifference{}
+	}
+	localVendors, _ := model.GetAllVendorMetas()
+	vendorName := map[int]string{}
+	for _, vendor := range localVendors {
+		vendorName[vendor.Id] = vendor.Name
+	}
+	localByName := map[string]model.Model{}
+	for _, item := range localModels {
+		localByName[item.ModelName] = item
+	}
+
+	diffs := make([]dto.CatalogDifference, 0)
+	for _, item := range items {
+		local, exists := localByName[item.ModelName]
+		diff := dto.CatalogDifference{
+			ModelName: item.ModelName,
+			Provider:  item.Provider,
+			Enabled:   item.Enabled,
+		}
+		if !exists {
+			diffs = append(diffs, diff)
+			continue
+		}
+		localProvider := vendorName[local.VendorID]
+		localEnabled := local.Status == 1
+		providerChanged := item.Provider != "" &&
+			!strings.EqualFold(strings.TrimSpace(localProvider), strings.TrimSpace(item.Provider))
+		if localEnabled == item.Enabled && !providerChanged {
+			continue
+		}
+		diff.Current = &struct {
+			Exists   bool   `json:"exists"`
+			Provider string `json:"provider,omitempty"`
+			Enabled  bool   `json:"enabled"`
+		}{
+			Exists:   true,
+			Provider: localProvider,
+			Enabled:  localEnabled,
+		}
+		diffs = append(diffs, diff)
+	}
+	return diffs
+}
+
+func buildToolPriceDifferences(upstream map[string]float64) []dto.ToolPriceDifference {
+	if len(upstream) == 0 {
+		return []dto.ToolPriceDifference{}
+	}
+	local := operation_setting.GetToolPricesCopy()
+	diffs := make([]dto.ToolPriceDifference, 0)
+	for key, value := range upstream {
+		current, ok := local[key]
+		if ok && nearlyEqual(current, value) {
+			continue
+		}
+		item := dto.ToolPriceDifference{Key: key, Upstream: value}
+		if ok {
+			copied := current
+			item.Current = &copied
+		}
+		diffs = append(diffs, item)
+	}
+	return diffs
 }
 
 func buildDifferences(localData map[string]any, successfulChannels []struct {
@@ -1021,9 +1144,132 @@ func GetSyncableChannels(c *gin.Context) {
 		Status:  1,
 	})
 
+	syncableChannels = append(syncableChannels, dto.SyncableChannel{
+		ID:      priceApplePresetID,
+		Name:    priceApplePresetName,
+		BaseURL: priceApplePresetBaseURL,
+		Status:  1,
+	})
+
 	c.JSON(http.StatusOK, gin.H{
 		"success": true,
 		"message": "",
 		"data":    syncableChannels,
 	})
+}
+
+func ApplyPriceAppleExtras(c *gin.Context) {
+	var req dto.ApplyPriceAppleExtrasRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"success": false, "message": "请求参数格式错误"})
+		return
+	}
+
+	catalogApplied := 0
+	for _, item := range req.Catalog {
+		if err := upsertPriceAppleCatalogItem(item); err != nil {
+			logger.LogError(c.Request.Context(), "apply priceapple catalog: "+err.Error())
+			c.JSON(http.StatusInternalServerError, gin.H{
+				"success": false,
+				"message": "更新模型目录失败: " + err.Error(),
+			})
+			return
+		}
+		catalogApplied++
+	}
+
+	toolsApplied := 0
+	if len(req.ToolPrices) > 0 {
+		merged := operation_setting.GetToolPricesCopy()
+		for key, value := range req.ToolPrices {
+			if strings.TrimSpace(key) == "" {
+				continue
+			}
+			merged[key] = value
+			toolsApplied++
+		}
+		encoded, err := common.Marshal(merged)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"success": false, "message": "序列化工具价格失败"})
+			return
+		}
+		if err := model.UpdateOption("tool_price_setting.prices", string(encoded)); err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"success": false, "message": "更新工具价格失败: " + err.Error()})
+			return
+		}
+	}
+
+	if catalogApplied > 0 {
+		model.InvalidatePricingCache()
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"success": true,
+		"data": gin.H{
+			"catalog_applied": catalogApplied,
+			"tools_applied":   toolsApplied,
+		},
+	})
+}
+
+func upsertPriceAppleCatalogItem(item dto.PriceAppleCatalogItem) error {
+	name := strings.TrimSpace(item.ModelName)
+	if name == "" {
+		return nil
+	}
+	status := 0
+	if item.Enabled {
+		status = 1
+	}
+	vendorID := 0
+	if strings.TrimSpace(item.Provider) != "" {
+		vendorID = ensurePriceAppleVendorID(item.Provider)
+	}
+
+	existing, err := model.GetModelMetaByName(name)
+	if err != nil {
+		if !errors.Is(err, gorm.ErrRecordNotFound) {
+			return err
+		}
+		created := &model.Model{
+			ModelName:    name,
+			Status:       status,
+			VendorID:     vendorID,
+			SyncOfficial: 1,
+			NameRule:     model.NameRuleExact,
+		}
+		return created.Insert()
+	}
+
+	updates := map[string]interface{}{
+		"status":       status,
+		"updated_time": common.GetTimestamp(),
+	}
+	if vendorID != 0 {
+		updates["vendor_id"] = vendorID
+	}
+	return model.DB.Model(existing).Updates(updates).Error
+}
+
+func ensurePriceAppleVendorID(name string) int {
+	name = strings.TrimSpace(name)
+	if name == "" {
+		return 0
+	}
+	existing, err := model.GetVendorByName(name)
+	if err == nil {
+		return existing.Id
+	}
+	if !errors.Is(err, gorm.ErrRecordNotFound) {
+		return 0
+	}
+	vendor := &model.Vendor{Name: name, Status: 1}
+	if err := vendor.Insert(); err != nil {
+		retry, retryErr := model.GetVendorByName(name)
+		if retryErr == nil {
+			return retry.Id
+		}
+		return 0
+	}
+	return vendor.Id
 }

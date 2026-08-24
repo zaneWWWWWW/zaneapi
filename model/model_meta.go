@@ -109,6 +109,21 @@ func GetAllModels(offset int, limit int) ([]*Model, error) {
 	return models, err
 }
 
+func GetAllModelMetas() ([]Model, error) {
+	var models []Model
+	err := DB.Find(&models).Error
+	return models, err
+}
+
+func GetModelMetaByName(name string) (*Model, error) {
+	var item Model
+	err := DB.Where("model_name = ?", name).First(&item).Error
+	if err != nil {
+		return nil, err
+	}
+	return &item, nil
+}
+
 func GetBoundChannelsByModelsMap(modelNames []string) (map[string][]BoundChannel, error) {
 	result := make(map[string][]BoundChannel)
 	if len(modelNames) == 0 {

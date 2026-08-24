@@ -252,11 +252,7 @@ function applyResolutionSelectionToDraft(
   )
 
   Object.keys(newModelRes).forEach((rt) => {
-    if (
-      category !== 'tiered' &&
-      getBillingCategory(rt) !== 'tiered' &&
-      getBillingCategory(rt) !== category
-    ) {
+    if (getBillingCategory(rt) !== category) {
       delete newModelRes[rt]
     }
   })
@@ -310,15 +306,12 @@ export function getEffectiveResolutionSelections(
     const resolved = resolveResolutionSelection(differences, selection)
     const category = getBillingCategory(resolved.ratioType)
 
-    if (category !== 'tiered') {
-      for (const [key, existing] of effectiveByKey) {
-        if (
-          existing.model === resolved.model &&
-          getBillingCategory(existing.ratioType) !== 'tiered' &&
-          getBillingCategory(existing.ratioType) !== category
-        ) {
-          effectiveByKey.delete(key)
-        }
+    for (const [key, existing] of effectiveByKey) {
+      if (
+        existing.model === resolved.model &&
+        getBillingCategory(existing.ratioType) !== category
+      ) {
+        effectiveByKey.delete(key)
       }
     }
 

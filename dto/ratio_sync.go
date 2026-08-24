@@ -37,3 +37,31 @@ type SyncableChannel struct {
 	Status  int    `json:"status"`
 	Type    int    `json:"type"`
 }
+
+type PriceAppleCatalogItem struct {
+	ModelName string `json:"model_name"`
+	Provider  string `json:"provider,omitempty"`
+	Enabled   bool   `json:"enabled"`
+}
+
+type CatalogDifference struct {
+	ModelName string `json:"model_name"`
+	Provider  string `json:"provider,omitempty"`
+	Enabled   bool   `json:"enabled"`
+	Current   *struct {
+		Exists   bool   `json:"exists"`
+		Provider string `json:"provider,omitempty"`
+		Enabled  bool   `json:"enabled"`
+	} `json:"current,omitempty"`
+}
+
+type ToolPriceDifference struct {
+	Key      string   `json:"key"`
+	Current  *float64 `json:"current"`
+	Upstream float64  `json:"upstream"`
+}
+
+type ApplyPriceAppleExtrasRequest struct {
+	Catalog    []PriceAppleCatalogItem `json:"catalog"`
+	ToolPrices map[string]float64      `json:"tool_prices"`
+}

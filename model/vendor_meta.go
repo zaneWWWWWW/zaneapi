@@ -1,6 +1,8 @@
 package model
 
 import (
+	"strings"
+
 	"github.com/QuantumNous/new-api/common"
 
 	"gorm.io/gorm"
@@ -53,6 +55,19 @@ func (v *Vendor) Delete() error {
 }
 
 // GetVendorByID 根据 ID 获取供应商
+func GetVendorByName(name string) (*Vendor, error) {
+	name = strings.TrimSpace(name)
+	if name == "" {
+		return nil, gorm.ErrRecordNotFound
+	}
+	var vendor Vendor
+	err := DB.Where("LOWER(name) = LOWER(?)", name).First(&vendor).Error
+	if err != nil {
+		return nil, err
+	}
+	return &vendor, nil
+}
+
 func GetVendorByID(id int) (*Vendor, error) {
 	var v Vendor
 	err := DB.First(&v, id).Error
@@ -63,6 +78,12 @@ func GetVendorByID(id int) (*Vendor, error) {
 }
 
 // GetAllVendors 获取全部供应商（分页）
+func GetAllVendorMetas() ([]Vendor, error) {
+	var vendors []Vendor
+	err := DB.Find(&vendors).Error
+	return vendors, err
+}
+
 func GetAllVendors(offset int, limit int) ([]*Vendor, error) {
 	var vendors []*Vendor
 	err := DB.Offset(offset).Limit(limit).Find(&vendors).Error
