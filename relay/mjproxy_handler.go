@@ -274,6 +274,7 @@ func RelaySwapFace(c *gin.Context, info *relaycommon.RelayInfo) *dto.MidjourneyR
 		Status:      "",
 		Progress:    "0%",
 		FailReason:  "",
+		Ip:          c.ClientIP(),
 		ChannelId:   c.GetInt("channel_id"),
 		Quota:       priceData.Quota,
 	}
@@ -590,6 +591,7 @@ func RelayMidjourneySubmit(c *gin.Context, relayInfo *relaycommon.RelayInfo) *dt
 		Status:      "",
 		Progress:    "0%",
 		FailReason:  "",
+		Ip:          c.ClientIP(),
 		ChannelId:   c.GetInt("channel_id"),
 		Quota:       priceData.Quota,
 	}

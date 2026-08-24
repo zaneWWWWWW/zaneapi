@@ -272,7 +272,7 @@ func Register(c *gin.Context) {
 	if common.EmailVerificationEnabled {
 		cleanUser.Email = user.Email
 	}
-	if err := cleanUser.Insert(inviterId); err != nil {
+	if err := cleanUser.Insert(inviterId, c.ClientIP()); err != nil {
 		if errors.Is(err, model.ErrEmailAlreadyTaken) {
 			common.ApiErrorI18n(c, i18n.MsgUserEmailAlreadyTaken)
 			return
@@ -1052,7 +1052,7 @@ func CreateUser(c *gin.Context) {
 			return
 		}
 	}
-	cleanUser.FinishInsert(0)
+	cleanUser.FinishInsert(0, c.ClientIP())
 
 	recordManageAuditFor(c, cleanUser.Id, "user.create", map[string]interface{}{
 		"username": cleanUser.Username,
@@ -1382,7 +1382,7 @@ func TopUp(c *gin.Context) {
 		common.ApiError(c, err)
 		return
 	}
-	quota, err := model.Redeem(req.Key, id)
+	quota, err := model.Redeem(req.Key, id, c.ClientIP())
 	if err != nil {
 		// 不向用户暴露兑换失败的细分原因，避免攻击者根据错误类型判断兑换码状态。
 		common.ApiErrorI18n(c, i18n.MsgRedeemFailed)
@@ -1408,7 +1408,6 @@ type UpdateUserSettingRequest struct {
 	GotifyPriority                   int     `json:"gotify_priority,omitempty"`
 	UpstreamModelUpdateNotifyEnabled *bool   `json:"upstream_model_update_notify_enabled,omitempty"`
 	AcceptUnsetModelRatioModel       bool    `json:"accept_unset_model_ratio_model"`
-	RecordIpLog                      bool    `json:"record_ip_log"`
 }
 
 func UpdateUserSetting(c *gin.Context) {
@@ -1510,7 +1509,6 @@ func UpdateUserSetting(c *gin.Context) {
 		QuotaWarningThreshold:            req.QuotaWarningThreshold,
 		UpstreamModelUpdateNotifyEnabled: upstreamModelUpdateNotifyEnabled,
 		AcceptUnsetRatioModel:            req.AcceptUnsetModelRatioModel,
-		RecordIpLog:                      req.RecordIpLog,
 	}
 
 	// 如果是webhook类型,添加webhook相关设置

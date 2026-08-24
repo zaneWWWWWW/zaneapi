@@ -224,6 +224,7 @@ func runMidjourneyTaskUpdateOnce(ctx context.Context, report func(processed, tot
 					ChannelId: task.ChannelId,
 					ModelName: service.CovertMjpActionToModelName(task.Action),
 					Quota:     task.Quota,
+					Ip:        task.Ip,
 					Other: map[string]interface{}{
 						"task_id": task.MjId,
 						"reason":  "构图失败",

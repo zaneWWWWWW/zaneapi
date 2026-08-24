@@ -134,7 +134,7 @@ func GetRedemptionById(id int) (*Redemption, error) {
 	return &redemption, err
 }
 
-func Redeem(key string, userId int) (quota int, err error) {
+func Redeem(key string, userId int, ip string) (quota int, err error) {
 	if key == "" {
 		return 0, errors.New("未提供兑换码")
 	}
@@ -181,7 +181,7 @@ func Redeem(key string, userId int) (quota int, err error) {
 		common.SysError("redemption failed: " + err.Error())
 		return 0, ErrRedeemFailed
 	}
-	RecordLog(userId, LogTypeTopup, fmt.Sprintf("通过兑换码充值 %s，兑换码ID %d", logger.LogQuota(redemption.Quota), redemption.Id))
+	RecordLog(userId, LogTypeTopup, fmt.Sprintf("通过兑换码充值 %s，兑换码ID %d", logger.LogQuota(redemption.Quota), redemption.Id), ip)
 	return redemption.Quota, nil
 }
 

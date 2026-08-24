@@ -191,6 +191,7 @@ func RefundTaskQuota(ctx context.Context, task *model.Task, reason string) bool 
 		Quota:     quota,
 		TokenId:   task.PrivateData.TokenId,
 		Group:     task.Group,
+		Ip:        task.Ip,
 		Other:     other,
 	})
 
@@ -269,6 +270,7 @@ func RecalculateTaskQuota(ctx context.Context, task *model.Task, actualQuota int
 		Quota:     logQuota,
 		TokenId:   task.PrivateData.TokenId,
 		Group:     task.Group,
+		Ip:        task.Ip,
 		Other:     other,
 		NodeName:  task.PrivateData.NodeName,
 	})

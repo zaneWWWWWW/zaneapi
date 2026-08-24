@@ -104,6 +104,7 @@ type RelayInfo struct {
 	RelayMode              int
 	OriginModelName        string
 	RequestURLPath         string
+	ClientIP               string
 	RequestHeaders         map[string]string
 	ShouldIncludeUsage     bool
 	DisablePing            bool // 是否禁止向下游发送自定义 Ping
@@ -473,6 +474,7 @@ func genBaseRelayInfo(c *gin.Context, request dto.Request) *RelayInfo {
 		UserEmail:  common.GetContextKeyString(c, constant.ContextKeyUserEmail),
 
 		OriginModelName: common.GetContextKeyString(c, constant.ContextKeyOriginalModel),
+		ClientIP:        c.ClientIP(),
 
 		TokenId:        common.GetContextKeyInt(c, constant.ContextKeyTokenId),
 		TokenKey:       common.GetContextKeyString(c, constant.ContextKeyTokenKey),

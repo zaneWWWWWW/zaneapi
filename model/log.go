@@ -141,7 +141,21 @@ func GetLogByTokenId(tokenId int) (logs []*Log, err error) {
 	return logs, err
 }
 
-func RecordLog(userId int, logType int, content string) {
+func requestClientIP(c *gin.Context) string {
+	if c == nil || c.Request == nil {
+		return ""
+	}
+	return c.ClientIP()
+}
+
+func firstExtraString(values []string) string {
+	if len(values) == 0 {
+		return ""
+	}
+	return values[0]
+}
+
+func RecordLog(userId int, logType int, content string, ip ...string) {
 	if logType == LogTypeConsume && !common.LogConsumeEnabled {
 		return
 	}
@@ -152,6 +166,7 @@ func RecordLog(userId int, logType int, content string) {
 		CreatedAt: common.GetTimestamp(),
 		Type:      logType,
 		Content:   content,
+		Ip:        firstExtraString(ip),
 	}
 	err := createLog(log)
 	if err != nil {
@@ -160,7 +175,7 @@ func RecordLog(userId int, logType int, content string) {
 }
 
 // RecordLogWithAdminInfo 记录操作日志，并将管理员相关信息存入 Other.admin_info，
-func RecordLogWithAdminInfo(userId int, logType int, content string, adminInfo map[string]interface{}) {
+func RecordLogWithAdminInfo(userId int, logType int, content string, adminInfo map[string]interface{}, ip ...string) {
 	if logType == LogTypeConsume && !common.LogConsumeEnabled {
 		return
 	}
@@ -171,6 +186,7 @@ func RecordLogWithAdminInfo(userId int, logType int, content string, adminInfo m
 		CreatedAt: common.GetTimestamp(),
 		Type:      logType,
 		Content:   content,
+		Ip:        firstExtraString(ip),
 	}
 	if len(adminInfo) > 0 {
 		other := map[string]interface{}{
@@ -286,35 +302,23 @@ func RecordErrorLog(c *gin.Context, userId int, channelId int, modelName string,
 	requestId := c.GetString(common.RequestIdKey)
 	upstreamRequestId := c.GetString(common.UpstreamRequestIdKey)
 	otherStr := common.MapToJsonStr(other)
-	// 判断是否需要记录 IP
-	needRecordIp := false
-	if settingMap, err := GetUserSetting(userId, false); err == nil {
-		if settingMap.RecordIpLog {
-			needRecordIp = true
-		}
-	}
 	log := &Log{
-		UserId:           userId,
-		Username:         username,
-		CreatedAt:        common.GetTimestamp(),
-		Type:             LogTypeError,
-		Content:          content,
-		PromptTokens:     0,
-		CompletionTokens: 0,
-		TokenName:        tokenName,
-		ModelName:        modelName,
-		Quota:            0,
-		ChannelId:        channelId,
-		TokenId:          tokenId,
-		UseTime:          useTimeSeconds,
-		IsStream:         isStream,
-		Group:            group,
-		Ip: func() string {
-			if needRecordIp {
-				return c.ClientIP()
-			}
-			return ""
-		}(),
+		UserId:            userId,
+		Username:          username,
+		CreatedAt:         common.GetTimestamp(),
+		Type:              LogTypeError,
+		Content:           content,
+		PromptTokens:      0,
+		CompletionTokens:  0,
+		TokenName:         tokenName,
+		ModelName:         modelName,
+		Quota:             0,
+		ChannelId:         channelId,
+		TokenId:           tokenId,
+		UseTime:           useTimeSeconds,
+		IsStream:          isStream,
+		Group:             group,
+		Ip:                requestClientIP(c),
 		RequestId:         requestId,
 		UpstreamRequestId: upstreamRequestId,
 		Other:             otherStr,
@@ -350,35 +354,23 @@ func RecordConsumeLog(c *gin.Context, userId int, params RecordConsumeLogParams)
 	upstreamRequestId := c.GetString(common.UpstreamRequestIdKey)
 	createdAt := common.GetTimestamp()
 	otherStr := common.MapToJsonStr(params.Other)
-	// 判断是否需要记录 IP
-	needRecordIp := false
-	if settingMap, err := GetUserSetting(userId, false); err == nil {
-		if settingMap.RecordIpLog {
-			needRecordIp = true
-		}
-	}
 	log := &Log{
-		UserId:           userId,
-		Username:         username,
-		CreatedAt:        createdAt,
-		Type:             LogTypeConsume,
-		Content:          params.Content,
-		PromptTokens:     params.PromptTokens,
-		CompletionTokens: params.CompletionTokens,
-		TokenName:        params.TokenName,
-		ModelName:        params.ModelName,
-		Quota:            params.Quota,
-		ChannelId:        params.ChannelId,
-		TokenId:          params.TokenId,
-		UseTime:          params.UseTimeSeconds,
-		IsStream:         params.IsStream,
-		Group:            params.Group,
-		Ip: func() string {
-			if needRecordIp {
-				return c.ClientIP()
-			}
-			return ""
-		}(),
+		UserId:            userId,
+		Username:          username,
+		CreatedAt:         createdAt,
+		Type:              LogTypeConsume,
+		Content:           params.Content,
+		PromptTokens:      params.PromptTokens,
+		CompletionTokens:  params.CompletionTokens,
+		TokenName:         params.TokenName,
+		ModelName:         params.ModelName,
+		Quota:             params.Quota,
+		ChannelId:         params.ChannelId,
+		TokenId:           params.TokenId,
+		UseTime:           params.UseTimeSeconds,
+		IsStream:          params.IsStream,
+		Group:             params.Group,
+		Ip:                requestClientIP(c),
 		RequestId:         requestId,
 		UpstreamRequestId: upstreamRequestId,
 		Other:             otherStr,
@@ -412,6 +404,7 @@ type RecordTaskBillingLogParams struct {
 	Quota     int
 	TokenId   int
 	Group     string
+	Ip        string
 	Other     map[string]interface{}
 	NodeName  string // 任务发起节点；为空时回退当前节点
 }
@@ -440,6 +433,7 @@ func RecordTaskBillingLog(params RecordTaskBillingLogParams) {
 		ChannelId: params.ChannelId,
 		TokenId:   params.TokenId,
 		Group:     params.Group,
+		Ip:        params.Ip,
 		Other:     common.MapToJsonStr(params.Other),
 	}
 	err := createLog(log)

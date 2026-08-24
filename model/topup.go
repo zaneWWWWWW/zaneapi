@@ -603,7 +603,7 @@ func RechargeHupijiao(tradeNo string, paidMoney decimal.Decimal, callerIp string
 	return nil
 }
 
-func RechargeWaffoPancake(tradeNo string) (err error) {
+func RechargeWaffoPancake(tradeNo string, callerIp string) (err error) {
 	if tradeNo == "" {
 		return errors.New("未提供支付单号")
 	}
@@ -658,7 +658,7 @@ func RechargeWaffoPancake(tradeNo string) (err error) {
 	}
 
 	if quotaToAdd > 0 {
-		RecordLog(topUp.UserId, LogTypeTopup, fmt.Sprintf("Waffo Pancake充值成功，充值额度: %v，支付金额: %.2f", logger.FormatQuota(quotaToAdd), topUp.Money))
+		RecordLog(topUp.UserId, LogTypeTopup, fmt.Sprintf("Waffo Pancake充值成功，充值额度: %v，支付金额: %.2f", logger.FormatQuota(quotaToAdd), topUp.Money), callerIp)
 	}
 
 	return nil

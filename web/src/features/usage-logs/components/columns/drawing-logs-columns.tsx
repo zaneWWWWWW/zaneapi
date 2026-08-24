@@ -55,6 +55,7 @@ import {
   createChannelColumn,
   createProgressColumn,
   createFailReasonColumn,
+  createIpColumn,
 } from './column-helpers'
 
 const drawingTypeIconMap: Record<string, LucideIcon> = {
@@ -116,6 +117,8 @@ export function useDrawingLogsColumns(
       createChannelColumn<MidjourneyLog>({ headerLabel: t('Channel') })
     )
   }
+
+  columns.push(createIpColumn<MidjourneyLog>({ headerLabel: t('IP Address') }))
 
   columns.push({
     accessorKey: 'action',

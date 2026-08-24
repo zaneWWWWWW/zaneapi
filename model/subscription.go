@@ -566,7 +566,7 @@ func refreshSubscriptionUserGroupCache(userId int, operation string) {
 // Complete a subscription order (idempotent). Creates a UserSubscription snapshot from the plan.
 // expectedPaymentProvider guards against cross-gateway callback attacks (empty skips the check).
 // actualPaymentMethod updates the order's PaymentMethod to reflect the real payment type used (empty skips update).
-func CompleteSubscriptionOrder(tradeNo string, providerPayload string, expectedPaymentProvider string, actualPaymentMethod string) error {
+func CompleteSubscriptionOrder(tradeNo string, providerPayload string, expectedPaymentProvider string, actualPaymentMethod string, callerIP ...string) error {
 	if tradeNo == "" {
 		return errors.New("tradeNo is empty")
 	}
@@ -635,7 +635,7 @@ func CompleteSubscriptionOrder(tradeNo string, providerPayload string, expectedP
 	}
 	if logUserId > 0 {
 		msg := fmt.Sprintf("订阅购买成功，套餐: %s，支付金额: %.2f，支付方式: %s", logPlanTitle, logMoney, logPaymentMethod)
-		RecordLog(logUserId, LogTypeTopup, msg)
+		RecordLog(logUserId, LogTypeTopup, msg, firstExtraString(callerIP))
 	}
 	return nil
 }
@@ -743,7 +743,7 @@ func calcSubscriptionBalanceQuota(priceAmount float64) (int, error) {
 }
 
 // PurchaseSubscriptionWithBalance creates a subscription by deducting the user's wallet quota.
-func PurchaseSubscriptionWithBalance(userId int, planId int) error {
+func PurchaseSubscriptionWithBalance(userId int, planId int, ip string) error {
 	if userId <= 0 || planId <= 0 {
 		return errors.New("invalid userId or planId")
 	}
@@ -830,7 +830,7 @@ func PurchaseSubscriptionWithBalance(userId int, planId int) error {
 		refreshSubscriptionUserGroupCache(userId, "subscription balance purchase")
 	}
 	msg := fmt.Sprintf("使用余额购买订阅成功，套餐: %s，支付金额: %.2f，扣除额度: %d", logPlanTitle, logMoney, chargedQuota)
-	RecordLog(userId, LogTypeTopup, msg)
+	RecordLog(userId, LogTypeTopup, msg, ip)
 	return nil
 }
 

@@ -41,6 +41,7 @@ import {
   createDurationColumn,
   createChannelColumn,
   createProgressColumn,
+  createIpColumn,
 } from './column-helpers'
 
 function parseTaskData(data: unknown): unknown[] {
@@ -161,6 +162,8 @@ export function useTaskLogsColumns(isAdmin: boolean): ColumnDef<TaskLog>[] {
       },
     })
   }
+
+  columns.push(createIpColumn<TaskLog>({ headerLabel: t('IP Address') }))
 
   columns.push(
     {

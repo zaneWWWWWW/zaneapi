@@ -588,7 +588,7 @@ func ensureEmailAvailableWithTx(tx *gorm.DB, email string, excludeUserID int) er
 	return nil
 }
 
-func (user *User) Insert(inviterId int) error {
+func (user *User) Insert(inviterId int, requestIP ...string) error {
 	if err := DB.Transaction(func(tx *gorm.DB) error {
 		return withNormalizedEmailLock(tx, user.Email, func(tx *gorm.DB) error {
 			if err := user.prepareForInsert(tx); err != nil {
@@ -610,11 +610,11 @@ func (user *User) Insert(inviterId int) error {
 		return err
 	}
 
-	user.finishInsert(inviterId)
+	user.finishInsert(inviterId, firstExtraString(requestIP))
 	return nil
 }
 
-func (user *User) finishInsert(inviterId int) {
+func (user *User) finishInsert(inviterId int, ip string) {
 	// 用户创建成功后，根据角色初始化边栏配置
 	// 需要重新获取用户以确保有正确的ID和Role
 	var createdUser User
@@ -631,23 +631,23 @@ func (user *User) finishInsert(inviterId int) {
 	}
 
 	if common.QuotaForNewUser > 0 {
-		RecordLog(user.Id, LogTypeSystem, fmt.Sprintf("新用户注册赠送 %s", logger.LogQuota(common.QuotaForNewUser)))
+		RecordLog(user.Id, LogTypeSystem, fmt.Sprintf("新用户注册赠送 %s", logger.LogQuota(common.QuotaForNewUser)), ip)
 	}
 	if inviterId != 0 && operation_setting.IsPaymentComplianceConfirmed() {
 		if common.QuotaForInvitee > 0 {
 			_ = IncreaseUserQuota(user.Id, common.QuotaForInvitee, true)
-			RecordLog(user.Id, LogTypeSystem, fmt.Sprintf("使用邀请码赠送 %s", logger.LogQuota(common.QuotaForInvitee)))
+			RecordLog(user.Id, LogTypeSystem, fmt.Sprintf("使用邀请码赠送 %s", logger.LogQuota(common.QuotaForInvitee)), ip)
 		}
 		if common.QuotaForInviter > 0 {
 			//_ = IncreaseUserQuota(inviterId, common.QuotaForInviter)
-			RecordLog(inviterId, LogTypeSystem, fmt.Sprintf("邀请用户赠送 %s", logger.LogQuota(common.QuotaForInviter)))
+			RecordLog(inviterId, LogTypeSystem, fmt.Sprintf("邀请用户赠送 %s", logger.LogQuota(common.QuotaForInviter)), ip)
 			_ = inviteUser(inviterId)
 		}
 	}
 }
 
-func (user *User) FinishInsert(inviterId int) {
-	user.finishInsert(inviterId)
+func (user *User) FinishInsert(inviterId int, requestIP ...string) {
+	user.finishInsert(inviterId, firstExtraString(requestIP))
 }
 
 // InsertWithTx inserts a new user within an existing transaction.
@@ -673,7 +673,7 @@ func (user *User) InsertWithTx(tx *gorm.DB, inviterId int) error {
 
 // FinalizeOAuthUserCreation performs post-transaction tasks for OAuth user creation.
 // This should be called after the transaction commits successfully.
-func (user *User) FinalizeOAuthUserCreation(inviterId int) {
+func (user *User) FinalizeOAuthUserCreation(inviterId int, requestIP ...string) {
 	// 用户创建成功后，根据角色初始化边栏配置
 	var createdUser User
 	if err := DB.Where("id = ?", user.Id).First(&createdUser).Error; err == nil {
@@ -687,16 +687,17 @@ func (user *User) FinalizeOAuthUserCreation(inviterId int) {
 		}
 	}
 
+	ip := firstExtraString(requestIP)
 	if common.QuotaForNewUser > 0 {
-		RecordLog(user.Id, LogTypeSystem, fmt.Sprintf("新用户注册赠送 %s", logger.LogQuota(common.QuotaForNewUser)))
+		RecordLog(user.Id, LogTypeSystem, fmt.Sprintf("新用户注册赠送 %s", logger.LogQuota(common.QuotaForNewUser)), ip)
 	}
 	if inviterId != 0 && operation_setting.IsPaymentComplianceConfirmed() {
 		if common.QuotaForInvitee > 0 {
 			_ = IncreaseUserQuota(user.Id, common.QuotaForInvitee, true)
-			RecordLog(user.Id, LogTypeSystem, fmt.Sprintf("使用邀请码赠送 %s", logger.LogQuota(common.QuotaForInvitee)))
+			RecordLog(user.Id, LogTypeSystem, fmt.Sprintf("使用邀请码赠送 %s", logger.LogQuota(common.QuotaForInvitee)), ip)
 		}
 		if common.QuotaForInviter > 0 {
-			RecordLog(inviterId, LogTypeSystem, fmt.Sprintf("邀请用户赠送 %s", logger.LogQuota(common.QuotaForInviter)))
+			RecordLog(inviterId, LogTypeSystem, fmt.Sprintf("邀请用户赠送 %s", logger.LogQuota(common.QuotaForInviter)), ip)
 			_ = inviteUser(inviterId)
 		}
 	}

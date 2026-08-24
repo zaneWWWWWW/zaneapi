@@ -70,6 +70,34 @@ export function CacheTooltip({
 // ============================================================================
 
 /**
+ * Create a request IP column shown by default on all log tables.
+ */
+export function createIpColumn<T>(config: {
+  headerLabel: string
+  accessorKey?: string
+}): ColumnDef<T> {
+  const accessorKey = config.accessorKey ?? 'ip'
+
+  return {
+    accessorKey,
+    header: config.headerLabel,
+    cell: ({ row }) => {
+      const ip = row.getValue(accessorKey) as string
+      if (!ip) {
+        return <span className='text-muted-foreground/60 text-xs'>-</span>
+      }
+      return (
+        <span className='font-mono text-xs tabular-nums' title={ip}>
+          {ip}
+        </span>
+      )
+    },
+    size: 140,
+    meta: { label: config.headerLabel },
+  }
+}
+
+/**
  * Create a timestamp column - compact mono style matching common logs
  */
 export function createTimestampColumn<T>(config: {

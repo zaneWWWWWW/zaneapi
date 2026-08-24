@@ -17,7 +17,7 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 For commercial licensing, please contact support@quantumnous.com
 */
 import { getRouteApi, useNavigate } from '@tanstack/react-router'
-import { useCallback, useMemo } from 'react'
+import { useCallback, useEffect, useMemo } from 'react'
 import { useTranslation } from 'react-i18next'
 
 import { SectionPageLayout } from '@/components/layout'
@@ -37,11 +37,11 @@ import { UsageLogsTable } from './components/usage-logs-table'
 import {
   isUsageLogsSectionId,
   USAGE_LOGS_DEFAULT_SECTION,
+  USAGE_LOGS_SECTION_IDS,
   type UsageLogsSectionId,
 } from './section-registry'
 
 const route = getRouteApi('/_authenticated/usage-logs/$section')
-const TASK_LOG_SECTIONS = ['drawing', 'task'] as const
 
 const SECTION_META: Record<UsageLogsSectionId, { titleKey: string }> = {
   common: {
@@ -75,8 +75,8 @@ function UsageLogsContent() {
   const tabNavGroups = useMemo<NavGroup[]>(
     () => [
       {
-        title: 'Task Logs',
-        items: TASK_LOG_SECTIONS.map((section) => ({
+        title: 'Usage Logs',
+        items: USAGE_LOGS_SECTION_IDS.map((section) => ({
           title: SECTION_META[section].titleKey,
           url: `/usage-logs/${section}`,
         })),
@@ -117,17 +117,23 @@ function UsageLogsContent() {
     [setViewScope]
   )
 
-  const pageMeta =
-    activeCategory === 'common' ? SECTION_META.common : SECTION_META.task
-  const showTaskSwitcher =
-    activeCategory !== 'common' && visibleSections.length > 1
+  useEffect(() => {
+    const fallbackSection = visibleSections[0]
+    if (!fallbackSection || visibleSections.includes(activeCategory)) return
+    void navigate({
+      to: '/usage-logs/$section',
+      params: { section: fallbackSection },
+      replace: true,
+    })
+  }, [activeCategory, navigate, visibleSections])
+
+  const showSectionTabs = visibleSections.length > 1
+  const canShowActiveSection = visibleSections.includes(activeCategory)
 
   return (
     <>
       <SectionPageLayout fixedContent>
-        <SectionPageLayout.Title>
-          {t(pageMeta.titleKey)}
-        </SectionPageLayout.Title>
+        <SectionPageLayout.Title>{t('Usage Logs')}</SectionPageLayout.Title>
         {canManageScope && (
           <SectionPageLayout.Actions>
             <Tabs value={viewScope} onValueChange={handleViewScopeChange}>
@@ -140,7 +146,7 @@ function UsageLogsContent() {
         )}
         <SectionPageLayout.Content>
           <div className='flex h-full min-h-0 flex-col gap-4'>
-            {showTaskSwitcher && (
+            {showSectionTabs && canShowActiveSection && (
               <Tabs value={activeCategory} onValueChange={handleSectionChange}>
                 <TabsList className='max-w-full flex-wrap justify-start group-data-horizontal/tabs:h-auto'>
                   {visibleSections.map((section) => (
@@ -152,7 +158,9 @@ function UsageLogsContent() {
               </Tabs>
             )}
             <div className='min-h-0 flex-1'>
-              <UsageLogsTable logCategory={activeCategory} />
+              {canShowActiveSection && (
+                <UsageLogsTable logCategory={activeCategory} />
+              )}
             </div>
           </div>
         </SectionPageLayout.Content>

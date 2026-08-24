@@ -349,6 +349,7 @@ function CommonLogsCard<TData>({
           cell={cells.get('token_name')}
           valueClassName='[&_.flex-col]:max-w-none [&_.flex-col>*:not(:first-child)]:text-[11px] [&_.flex-col>*:not(:first-child)]:leading-none'
         />
+        <SummaryField label={t('IP Address')} cell={cells.get('ip')} />
         {rowData ? (
           <MobileStreamTimingField log={rowData} />
         ) : (
@@ -390,6 +391,7 @@ function TaskLogsCard<TData>({
       <div className='grid grid-cols-2 gap-1.5'>
         <SummaryField label={t('Submit Time')} cell={submitTimeCell} />
         <SummaryField label={t('User')} cell={cells.get('user')} primaryOnly />
+        <SummaryField label={t('IP Address')} cell={cells.get('ip')} />
         <SummaryField
           label={t('Result')}
           cell={cells.get('fail_reason')}
@@ -426,6 +428,7 @@ function DrawingLogsCard<TData>({
           primaryOnly
         />
         <SummaryField label={t('Task ID')} cell={cells.get('mj_id')} />
+        <SummaryField label={t('IP Address')} cell={cells.get('ip')} />
         <SummaryField
           label={t('Duration')}
           cell={cells.get('duration')}

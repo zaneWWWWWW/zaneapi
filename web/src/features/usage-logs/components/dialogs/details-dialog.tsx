@@ -496,8 +496,7 @@ export function DetailsDialog(props: DetailsDialogProps) {
     !!other?.expr_b64
   const hasAudioTokens = other?.ws || other?.audio
   const showTiming = isTimingLogType(props.log.type)
-  const showAdminIp =
-    !!props.log.ip && (showTiming || (props.isAdmin && isTopup))
+  const showRequestIp = !!props.log.ip
   const adminInfo = other?.admin_info
   const topupAuditFields =
     isTopup && props.isAdmin && adminInfo
@@ -576,10 +575,6 @@ export function DetailsDialog(props: DetailsDialogProps) {
         other?.login_method && {
           label: t('Login Method'),
           value: String(other.login_method),
-        },
-        props.log.ip && {
-          label: t('IP Address'),
-          value: props.log.ip,
         },
         other?.user_agent && {
           label: t('User Agent'),
@@ -690,7 +685,7 @@ export function DetailsDialog(props: DetailsDialogProps) {
             />
           )}
 
-          {showAdminIp && (
+          {showRequestIp && (
             <DetailRow
               label={t('IP Address')}
               value={
