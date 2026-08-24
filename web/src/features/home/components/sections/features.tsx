@@ -17,14 +17,12 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 For commercial licensing, please contact support@quantumnous.com
 */
 import {
-  Zap,
-  Shield,
-  Globe,
+  BarChart3,
   Code,
-  Gauge,
-  DollarSign,
-  Users,
-  HeartHandshake,
+  Image,
+  KeyRound,
+  MessageSquare,
+  Video,
 } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 
@@ -39,21 +37,20 @@ export function Features(_props: FeaturesProps) {
 
   const features = [
     {
-      id: 'fast',
+      id: 'models',
       num: '01',
-      title: t('Lightning Fast'),
+      title: t('One key, many models'),
       desc: t(
-        'Optimized network architecture ensures millisecond response times'
+        'Call OpenAI, Claude, Gemini, DeepSeek, and Qwen through a single token.'
       ),
       span: 'md:col-span-2',
-      icon: <Zap className='size-4 text-blue-400' />,
       visual: (
         <div className='mt-4 grid grid-cols-3 gap-2'>
           {['OpenAI', 'Claude', 'Gemini', 'DeepSeek', 'Qwen', 'Llama'].map(
             (name) => (
               <div
                 key={name}
-                className='border-border/30 bg-muted/20 text-muted-foreground flex items-center justify-center rounded-lg border px-3 py-2 text-xs transition-colors duration-300 hover:border-blue-500/30 hover:bg-blue-500/5'
+                className='border-border bg-muted/30 text-muted-foreground hover:text-foreground flex items-center justify-center rounded-lg border px-3 py-2 text-xs transition-colors duration-200'
               >
                 {name}
               </div>
@@ -63,138 +60,131 @@ export function Features(_props: FeaturesProps) {
       ),
     },
     {
-      id: 'secure',
+      id: 'modalities',
       num: '02',
-      title: t('Secure & Reliable'),
+      title: t('Chat, code, image, and video'),
       desc: t(
-        'Enterprise-grade security with comprehensive permission management'
+        'OpenAI-compatible routes for completions, images, and video tasks.'
       ),
       span: 'md:col-span-1',
-      icon: <Shield className='size-4 text-emerald-400' />,
       visual: (
-        <div className='mt-4 flex items-center justify-center'>
-          <div className='relative'>
-            <div className='flex size-16 items-center justify-center rounded-2xl border border-emerald-500/20 bg-emerald-500/5'>
-              <Shield
-                className='size-7 text-emerald-500/70'
-                strokeWidth={1.5}
-              />
-            </div>
-            <div className='absolute -top-1 -right-1 flex size-4 items-center justify-center rounded-full bg-emerald-500'>
-              <svg
-                className='size-2.5 text-white'
-                fill='none'
-                viewBox='0 0 24 24'
-                stroke='currentColor'
-                strokeWidth={3}
+        <div className='mt-4 grid grid-cols-2 gap-2'>
+          {[
+            { icon: MessageSquare, label: t('Chat') },
+            { icon: Image, label: t('Image') },
+            { icon: Video, label: t('Video') },
+            { icon: Code, label: t('Code') },
+          ].map((item) => {
+            const Icon = item.icon
+            return (
+              <div
+                key={item.label}
+                className='border-border bg-muted/30 text-muted-foreground flex items-center gap-1.5 rounded-lg border px-2.5 py-2 text-xs'
               >
-                <path
-                  strokeLinecap='round'
-                  strokeLinejoin='round'
-                  d='m4.5 12.75 6 6 9-13.5'
-                />
-              </svg>
-            </div>
-          </div>
-        </div>
-      ),
-    },
-    {
-      id: 'global',
-      num: '03',
-      title: t('Global Coverage'),
-      desc: t('Multi-region deployment for stable global access'),
-      span: 'md:col-span-1',
-      icon: <Globe className='size-4 text-violet-400' />,
-      visual: (
-        <div className='mt-4 space-y-2'>
-          {[t('Load Balancing'), t('Rate Limiting'), t('Cost Tracking')].map(
-            (step, i) => (
-              <div key={step} className='flex items-center gap-2'>
-                <div
-                  className={`flex size-6 items-center justify-center rounded-full text-[10px] font-bold ${
-                    i === 1
-                      ? 'border border-blue-500/30 bg-blue-500/20 text-blue-500'
-                      : 'border-border/40 bg-muted text-muted-foreground border'
-                  }`}
-                >
-                  {i + 1}
-                </div>
-                <div className='bg-border/40 h-px flex-1' />
-                <span className='text-muted-foreground text-xs'>{step}</span>
+                <Icon className='size-3.5 shrink-0' strokeWidth={1.75} />
+                {item.label}
               </div>
             )
-          )}
+          })}
         </div>
       ),
     },
     {
-      id: 'developer',
-      num: '04',
-      title: t('Developer Friendly'),
-      desc: t('Compatible API routes for common AI application workflows'),
-      span: 'md:col-span-2',
-      icon: <Code className='size-4 text-amber-400' />,
+      id: 'billing',
+      num: '03',
+      title: t('Usage and billing in one place'),
+      desc: t(
+        'See cost and traffic for every chat, image, and video request.'
+      ),
+      span: 'md:col-span-1',
       visual: (
-        <div className='mt-4 flex items-center gap-3'>
-          <div className='flex -space-x-2'>
-            {['API', 'SDK', 'CLI', 'Docs'].map((n) => (
-              <div
-                key={n}
-                className='border-background from-muted to-muted/60 text-muted-foreground flex size-8 items-center justify-center rounded-full border-2 bg-gradient-to-br text-[9px] font-bold'
-              >
-                {n}
+        <div className='mt-4 space-y-2'>
+          {[t('Chat'), t('Image Generation'), t('Video')].map((step, i) => (
+            <div key={step} className='flex items-center gap-2'>
+              <div className='border-border bg-muted text-muted-foreground flex size-6 items-center justify-center rounded-full border text-[10px] font-bold'>
+                {i + 1}
               </div>
-            ))}
-          </div>
-          <div className='text-muted-foreground flex items-center gap-1.5 text-xs'>
-            <Code className='size-3.5 text-blue-500' />
-            {t('Multi-protocol Compatible')}
-          </div>
+              <div className='bg-border h-px flex-1' />
+              <span className='text-muted-foreground text-xs'>{step}</span>
+            </div>
+          ))}
+        </div>
+      ),
+    },
+    {
+      id: 'compatible',
+      num: '04',
+      title: t('Drop into existing clients'),
+      desc: t(
+        'Point your OpenAI-compatible app at this gateway and keep your current SDK.'
+      ),
+      span: 'md:col-span-2',
+      visual: (
+        <div className='text-muted-foreground mt-4 font-mono text-xs'>
+          <div>OPENAI_BASE_URL=https://your-gateway/v1</div>
+          <div>OPENAI_API_KEY=sk-••••</div>
         </div>
       ),
     },
   ]
 
-  const additionalFeatures = [
+  const steps = [
     {
-      icon: <Gauge className='size-5' strokeWidth={1.5} />,
-      title: t('High Performance'),
-      desc: t('Support for high concurrency with automatic load balancing'),
+      num: '1',
+      title: t('Get a key'),
+      desc: t('Create a token after you sign in.'),
+      icon: <KeyRound className='size-5' strokeWidth={1.5} />,
     },
     {
-      icon: <DollarSign className='size-5' strokeWidth={1.5} />,
-      title: t('Transparent Billing'),
-      desc: t('Pay-as-you-go with real-time usage monitoring'),
+      num: '2',
+      title: t('Call the gateway'),
+      desc: t('Send chat, image, and video requests with the same base URL.'),
+      icon: <MessageSquare className='size-5' strokeWidth={1.5} />,
     },
     {
-      icon: <Users className='size-5' strokeWidth={1.5} />,
-      title: t('Team Collaboration'),
-      desc: t('Multi-user management with flexible permission allocation'),
-    },
-    {
-      icon: <HeartHandshake className='size-5' strokeWidth={1.5} />,
-      title: t('Open Source'),
-      desc: t('Community driven, self-hosted, and extensible'),
+      num: '3',
+      title: t('Monitor'),
+      desc: t('Track usage, costs and performance with real-time analytics'),
+      icon: <BarChart3 className='size-5' strokeWidth={1.5} />,
     },
   ]
 
   return (
     <section className='relative z-10 px-6 py-24 md:py-32'>
       <div className='mx-auto max-w-6xl'>
-        <AnimateInView className='mb-16 max-w-lg'>
-          <p className='text-muted-foreground mb-3 text-xs font-medium tracking-widest uppercase'>
-            {t('Core Features')}
+        <AnimateInView className='mb-10 max-w-lg md:mb-12'>
+          <p className='text-muted-foreground mb-3 text-xs font-medium'>
+            {t('How it works')}
           </p>
-          <h2 className='text-2xl leading-tight font-bold tracking-tight md:text-3xl'>
-            {t('Built for developers,')}
-            <br />
-            {t('designed for scale')}
+          <h2 className='text-2xl leading-tight font-semibold tracking-tight md:text-3xl'>
+            {t('One gateway for the models your apps already use')}
           </h2>
         </AnimateInView>
 
-        {/* Bento grid */}
-        <div className='border-border/40 bg-border/40 grid gap-px overflow-hidden rounded-xl border md:grid-cols-3'>
+        <div className='mb-10 grid gap-6 md:mb-12 md:grid-cols-3 md:gap-8'>
+          {steps.map((step, i) => (
+            <AnimateInView
+              key={step.num}
+              delay={i * 80}
+              animation='fade-up'
+              className='flex gap-3'
+            >
+              <div className='text-muted-foreground border-border bg-muted/30 flex size-10 shrink-0 items-center justify-center rounded-lg border'>
+                {step.icon}
+              </div>
+              <div className='min-w-0'>
+                <h3 className='text-sm font-semibold'>
+                  {step.num}. {step.title}
+                </h3>
+                <p className='text-muted-foreground mt-1 text-sm leading-relaxed'>
+                  {step.desc}
+                </p>
+              </div>
+            </AnimateInView>
+          ))}
+        </div>
+
+        <div className='border-border bg-border grid gap-px overflow-hidden rounded-lg border md:grid-cols-3'>
           {features.map((f, i) => (
             <AnimateInView
               key={f.id}
@@ -212,26 +202,6 @@ export function Features(_props: FeaturesProps) {
                 {f.desc}
               </p>
               {f.visual}
-            </AnimateInView>
-          ))}
-        </div>
-
-        {/* Additional features row */}
-        <div className='mt-12 grid grid-cols-2 gap-8 md:grid-cols-4 md:gap-12'>
-          {additionalFeatures.map((f, i) => (
-            <AnimateInView
-              key={f.title}
-              delay={i * 100}
-              animation='fade-up'
-              className='flex flex-col items-center text-center'
-            >
-              <div className='text-muted-foreground border-border/50 bg-muted/30 group-hover:text-foreground mb-3 flex size-12 items-center justify-center rounded-xl border transition-colors'>
-                {f.icon}
-              </div>
-              <h3 className='mb-1.5 text-sm font-semibold'>{f.title}</h3>
-              <p className='text-muted-foreground max-w-[200px] text-xs leading-relaxed'>
-                {f.desc}
-              </p>
             </AnimateInView>
           ))}
         </div>

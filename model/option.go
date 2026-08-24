@@ -73,6 +73,7 @@ func InitOptionMap() {
 	common.OptionMap["Notice"] = ""
 	common.OptionMap["About"] = ""
 	common.OptionMap["HomePageContent"] = ""
+	common.OptionMap["HomePageDisplayedGroups"] = "[]"
 	common.OptionMap["Footer"] = common.Footer
 	common.OptionMap["SystemName"] = common.SystemName
 	common.OptionMap["Logo"] = common.Logo
@@ -654,6 +655,14 @@ func validateOptionValue(key string, value string) error {
 	case "RelayTraceLogFullBodyEnabled":
 		if _, err := strconv.ParseBool(value); err != nil {
 			return fmt.Errorf("invalid relay trace full body setting: %s", value)
+		}
+	case "HomePageDisplayedGroups":
+		if strings.TrimSpace(value) == "" {
+			return nil
+		}
+		var names []string
+		if err := common.UnmarshalJsonStr(value, &names); err != nil {
+			return fmt.Errorf("invalid home page displayed groups")
 		}
 	}
 	return nil

@@ -37,3 +37,9 @@ export interface HomePageContentResult {
   isLoaded: boolean
   isUrl: boolean
 }
+
+export interface HomePageGroupRatio {
+  name: string
+  description: string
+  ratio: number
+}

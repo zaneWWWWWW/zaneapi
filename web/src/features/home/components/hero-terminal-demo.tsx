@@ -17,6 +17,7 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 For commercial licensing, please contact support@quantumnous.com
 */
 import { useState, useEffect, useRef, type ReactNode } from 'react'
+import { useTranslation } from 'react-i18next'
 
 import { cn } from '@/lib/utils'
 
@@ -24,7 +25,7 @@ type AccentTone = 'emerald' | 'amber' | 'blue' | 'violet'
 
 interface ApiDemoConfig {
   id: string
-  label: string
+  labelKey: string
   method: 'POST' | 'GET'
   endpoint: string
   headers: string[]
@@ -34,46 +35,26 @@ interface ApiDemoConfig {
   tokens: number
   latency: number
   accent: AccentTone
+  streaming?: boolean
 }
 
-const ACCENT_CLASSES: Record<
-  AccentTone,
-  {
-    activeText: string
-    activeBorder: string
-    badge: string
-  }
-> = {
-  emerald: {
-    activeText: 'text-emerald-600 dark:text-emerald-400',
-    activeBorder: 'border-emerald-500 dark:border-emerald-400',
-    badge:
-      'bg-emerald-500/10 text-emerald-600 dark:bg-emerald-400/10 dark:text-emerald-400',
-  },
-  amber: {
-    activeText: 'text-amber-600 dark:text-amber-400',
-    activeBorder: 'border-amber-500 dark:border-amber-400',
-    badge:
-      'bg-amber-500/10 text-amber-600 dark:bg-amber-400/10 dark:text-amber-400',
-  },
-  blue: {
-    activeText: 'text-blue-600 dark:text-blue-400',
-    activeBorder: 'border-blue-500 dark:border-blue-400',
-    badge:
-      'bg-blue-500/10 text-blue-600 dark:bg-blue-400/10 dark:text-blue-400',
-  },
-  violet: {
-    activeText: 'text-violet-600 dark:text-violet-400',
-    activeBorder: 'border-violet-500 dark:border-violet-400',
-    badge:
-      'bg-violet-500/10 text-violet-600 dark:bg-violet-400/10 dark:text-violet-400',
-  },
+const NEUTRAL_ACCENT = {
+  activeText: 'text-foreground',
+  activeBorder: 'border-foreground',
+  badge: 'bg-muted text-foreground',
+}
+
+const ACCENT_CLASSES: Record<AccentTone, typeof NEUTRAL_ACCENT> = {
+  emerald: NEUTRAL_ACCENT,
+  amber: NEUTRAL_ACCENT,
+  blue: NEUTRAL_ACCENT,
+  violet: NEUTRAL_ACCENT,
 }
 
 const API_DEMOS: ApiDemoConfig[] = [
   {
-    id: 'gpt-chat',
-    label: 'Chat',
+    id: 'chat',
+    labelKey: 'Chat',
     method: 'POST',
     endpoint: '/v1/chat/completions',
     headers: ['"Authorization: Bearer sk-••••"'],
@@ -93,70 +74,73 @@ const API_DEMOS: ApiDemoConfig[] = [
     tokens: 27,
     latency: 142,
     accent: 'emerald',
+    streaming: true,
   },
   {
-    id: 'responses',
-    label: 'Responses',
+    id: 'code',
+    labelKey: 'Code',
     method: 'POST',
-    endpoint: '/v1/responses',
+    endpoint: '/v1/chat/completions',
     headers: ['"Authorization: Bearer sk-••••"'],
-    request: ['"model": "your-model",', '"input": "..."'],
-    response: [
-      '{',
-      '  "output": [{ "type": "output_text", "text": <text> }],',
-      '  "usage": { "total_tokens": <tokens> }',
-      '}',
-    ],
-    responseHighlights: ['<text>', '<tokens>'],
-    tokens: 31,
-    latency: 168,
-    accent: 'amber',
-  },
-  {
-    id: 'claude',
-    label: 'Claude',
-    method: 'POST',
-    endpoint: '/v1/messages',
-    headers: ['"x-api-key: sk-••••"', '"anthropic-version: 2023-06-01"'],
     request: [
-      '"model": "your-model",',
-      '"max_tokens": 1024,',
+      '"model": "your-code-model",',
       '"messages": [',
       '  { "role": "user", "content": "..." }',
       ']',
     ],
     response: [
       '{',
-      '  "content": [{ "type": "text", "text": <text> }],',
-      '  "usage": { "input_tokens": <in>, "output_tokens": <out> }',
-      '}',
-    ],
-    responseHighlights: ['<text>', '<in>', '<out>'],
-    tokens: 29,
-    latency: 156,
-    accent: 'blue',
-  },
-  {
-    id: 'gemini',
-    label: 'Gemini',
-    method: 'POST',
-    endpoint: '/v1beta/models/{model}:generateContent',
-    headers: ['"x-goog-api-key: sk-••••"'],
-    request: [
-      '"contents": [',
-      '  { "role": "user",',
-      '    "parts": [{ "text": "..." }] }',
-      ']',
-    ],
-    response: [
-      '{',
-      '  "candidates": [{ "content": { "parts": [{ "text": <text> }] } }],',
-      '  "usageMetadata": { "totalTokenCount": <tokens> }',
+      '  "choices": [{ "message": { "content": <text> } }],',
+      '  "usage": { "total_tokens": <tokens> }',
       '}',
     ],
     responseHighlights: ['<text>', '<tokens>'],
-    tokens: 25,
-    latency: 93,
+    tokens: 64,
+    latency: 188,
+    accent: 'amber',
+    streaming: true,
+  },
+  {
+    id: 'image',
+    labelKey: 'Image',
+    method: 'POST',
+    endpoint: '/v1/images/generations',
+    headers: ['"Authorization: Bearer sk-••••"'],
+    request: [
+      '"model": "your-image-model",',
+      '"prompt": "...",',
+      '"n": 1',
+    ],
+    response: [
+      '{',
+      '  "data": [{ "url": <text> }]',
+      '}',
+    ],
+    responseHighlights: ['<text>'],
+    tokens: 1,
+    latency: 890,
+    accent: 'blue',
+  },
+  {
+    id: 'video',
+    labelKey: 'Video',
+    method: 'POST',
+    endpoint: '/v1/videos',
+    headers: ['"Authorization: Bearer sk-••••"'],
+    request: [
+      '"model": "your-video-model",',
+      '"prompt": "...",',
+      '"seconds": 8',
+    ],
+    response: [
+      '{',
+      '  "id": <text>,',
+      '  "status": "queued"',
+      '}',
+    ],
+    responseHighlights: ['<text>'],
+    tokens: 8,
+    latency: 240,
     accent: 'violet',
   },
 ]
@@ -169,6 +153,7 @@ interface HeroTerminalDemoProps {
 }
 
 export function HeroTerminalDemo(props: HeroTerminalDemoProps) {
+  const { t } = useTranslation()
   const [activeIndex, setActiveIndex] = useState(0)
   const [transitioning, setTransitioning] = useState(false)
   const intervalRef = useRef<ReturnType<typeof setInterval>>(undefined)
@@ -210,9 +195,8 @@ export function HeroTerminalDemo(props: HeroTerminalDemoProps) {
     <div className={cn('mx-auto w-full max-w-2xl', props.className)}>
       <div
         className={cn(
-          'overflow-hidden rounded-2xl border backdrop-blur-sm',
-          'border-border/60 bg-white/95 shadow-[0_20px_50px_-25px_rgba(15,23,42,0.18)]',
-          'dark:border-white/[0.06] dark:bg-[#0b0f17]/95 dark:shadow-[0_20px_60px_-25px_rgba(0,0,0,0.7)]'
+          'overflow-hidden rounded-lg border',
+          'border-border bg-card shadow-xs'
         )}
       >
         {/* Tab strip */}
@@ -227,6 +211,7 @@ export function HeroTerminalDemo(props: HeroTerminalDemoProps) {
             const isActive = index === activeIndex
             return (
               <button
+                type='button'
                 key={item.id}
                 onClick={() => handleSelect(index)}
                 className={cn(
@@ -236,12 +221,12 @@ export function HeroTerminalDemo(props: HeroTerminalDemoProps) {
                     : 'text-foreground/40 hover:text-foreground/70 border-transparent'
                 )}
               >
-                {item.label}
+                {t(item.labelKey)}
               </button>
             )
           })}
           <div className='ml-auto flex items-center gap-2 pr-2 sm:pr-3'>
-            <span className='inline-block size-1.5 rounded-full bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.45)]' />
+            <span className='bg-foreground/70 inline-block size-1.5 rounded-full' />
             <span className='text-foreground/40 font-mono text-[10px] tracking-wider uppercase'>
               200 ok
             </span>
@@ -295,10 +280,17 @@ export function HeroTerminalDemo(props: HeroTerminalDemoProps) {
               <span className='tracking-wider uppercase'>ms</span>
             </span>
             <span className='bg-foreground/15 size-1 rounded-full' />
-            <span className='flex items-center gap-1'>
-              <span className='font-mono'>{demo.tokens}</span>
-              <span className='tracking-wider uppercase'>tokens</span>
-            </span>
+            {demo.streaming ? (
+              <span className='flex items-center gap-1'>
+                <span className='font-mono'>{demo.tokens}</span>
+                <span className='tracking-wider uppercase'>tokens</span>
+              </span>
+            ) : (
+              <span className='flex items-center gap-1'>
+                <span className='font-mono'>{demo.tokens}</span>
+                <span className='tracking-wider uppercase'>units</span>
+              </span>
+            )}
             <span className='bg-foreground/15 size-1 rounded-full' />
             <span className='flex items-center gap-1'>
               <span className='tracking-wider uppercase'>cost</span>
@@ -308,7 +300,7 @@ export function HeroTerminalDemo(props: HeroTerminalDemoProps) {
             </span>
           </div>
           <span className='text-foreground/30 font-mono text-[10px] tracking-wider uppercase'>
-            stream · sse
+            {demo.streaming ? 'stream · sse' : 'json'}
           </span>
         </div>
       </div>
@@ -342,8 +334,8 @@ function RequestBlock(props: { demo: ApiDemoConfig; transitioning: boolean }) {
         <CodeLine indent={2}>
           <Flag>-d</Flag> <StringText>&apos;{'{'}</StringText>
         </CodeLine>
-        {demo.request.map((line, i) => (
-          <CodeLine key={i} indent={4}>
+        {demo.request.map((line) => (
+          <CodeLine key={line} indent={4}>
             {renderJsonLine(line)}
           </CodeLine>
         ))}
@@ -372,8 +364,8 @@ function ResponseBlock(props: { demo: ApiDemoConfig; transitioning: boolean }) {
           transitioning ? 'opacity-0' : 'opacity-100'
         )}
       >
-        {demo.response.map((line, i) => (
-          <CodeLine key={i}>{renderResponseLine(line, demo)}</CodeLine>
+        {demo.response.map((line) => (
+          <CodeLine key={line}>{renderResponseLine(line, demo)}</CodeLine>
         ))}
       </div>
     </div>
@@ -382,7 +374,7 @@ function ResponseBlock(props: { demo: ApiDemoConfig; transitioning: boolean }) {
 
 function SectionLabel(props: { children: ReactNode }) {
   return (
-    <span className='text-foreground/30 font-sans text-[10px] font-semibold tracking-[0.18em] uppercase'>
+    <span className='text-muted-foreground font-sans text-[10px] font-medium'>
       {props.children}
     </span>
   )
@@ -405,36 +397,36 @@ function renderResponseLine(line: string, demo: ApiDemoConfig): ReactNode {
 
   if (matches.length === 0) return tokenize(line)
 
-  matches.forEach((match, idx) => {
+  matches.forEach((match) => {
     const start = match.index ?? 0
     if (start > cursor) {
       segments.push(
-        <span key={`pre-${idx}`}>{tokenize(line.slice(cursor, start))}</span>
+        <span key={`pre-${start}`}>{tokenize(line.slice(cursor, start))}</span>
       )
     }
     const placeholder = match[0]
     if (placeholder === '<text>') {
       segments.push(
-        <Accent key={`ph-${idx}`} accent={demo.accent}>
+        <Accent key={`ph-${start}`} accent={demo.accent}>
           {`"${truncateResponse(demo)}"`}
         </Accent>
       )
     } else if (placeholder === '<tokens>') {
-      segments.push(<NumberText key={`ph-${idx}`}>{demo.tokens}</NumberText>)
+      segments.push(<NumberText key={`ph-${start}`}>{demo.tokens}</NumberText>)
     } else if (placeholder === '<in>') {
       segments.push(
-        <NumberText key={`ph-${idx}`}>
+        <NumberText key={`ph-${start}`}>
           {Math.floor(demo.tokens * 0.4)}
         </NumberText>
       )
     } else if (placeholder === '<out>') {
       segments.push(
-        <NumberText key={`ph-${idx}`}>
+        <NumberText key={`ph-${start}`}>
           {Math.ceil(demo.tokens * 0.6)}
         </NumberText>
       )
     } else {
-      segments.push(<Muted key={`ph-${idx}`}>{placeholder}</Muted>)
+      segments.push(<Muted key={`ph-${start}`}>{placeholder}</Muted>)
     }
     cursor = start + placeholder.length
   })
@@ -448,10 +440,10 @@ function renderResponseLine(line: string, demo: ApiDemoConfig): ReactNode {
 
 function truncateResponse(demo: ApiDemoConfig): string {
   const map: Record<string, string> = {
-    'gpt-chat': 'Chat request routed.',
-    responses: 'Response workflow ready.',
-    claude: 'Claude message routed.',
-    gemini: 'Gemini request served.',
+    chat: 'Chat request routed.',
+    code: 'def greet(): ...',
+    image: 'https://cdn.example/img.png',
+    video: 'task_xxxx',
   }
   return map[demo.id] ?? '...'
 }
@@ -462,20 +454,20 @@ function tokenize(input: string): ReactNode {
   let cursor = 0
   const matches = [...input.matchAll(STRING_RE)]
 
-  matches.forEach((match, idx) => {
+  matches.forEach((match) => {
     const start = match.index ?? 0
     if (start > cursor) {
       segments.push(
-        <Muted key={`m-${idx}`}>{input.slice(cursor, start)}</Muted>
+        <Muted key={`m-${start}`}>{input.slice(cursor, start)}</Muted>
       )
     }
     const text = match[0]
     const after = input.slice(start + text.length).trimStart()
     const isKey = after.startsWith(':')
     if (isKey) {
-      segments.push(<Key key={`k-${idx}`}>{text}</Key>)
+      segments.push(<Key key={`k-${start}`}>{text}</Key>)
     } else {
-      segments.push(<StringText key={`s-${idx}`}>{text}</StringText>)
+      segments.push(<StringText key={`s-${start}`}>{text}</StringText>)
     }
     cursor = start + text.length
   })
@@ -503,37 +495,23 @@ function CodeLine(props: { children: ReactNode; indent?: number }) {
 }
 
 function Command(props: { children: ReactNode }) {
-  return (
-    <span className='font-medium text-emerald-600 dark:text-emerald-400'>
-      {props.children}
-    </span>
-  )
+  return <span className='text-foreground font-medium'>{props.children}</span>
 }
 
 function Flag(props: { children: ReactNode }) {
-  return (
-    <span className='text-blue-600 dark:text-blue-400'>{props.children}</span>
-  )
+  return <span className='text-muted-foreground'>{props.children}</span>
 }
 
 function Key(props: { children: ReactNode }) {
-  return (
-    <span className='text-sky-700 dark:text-sky-300'>{props.children}</span>
-  )
+  return <span className='text-foreground/80'>{props.children}</span>
 }
 
 function StringText(props: { children: ReactNode }) {
-  return (
-    <span className='text-amber-700 dark:text-amber-300'>{props.children}</span>
-  )
+  return <span className='text-muted-foreground'>{props.children}</span>
 }
 
 function NumberText(props: { children: ReactNode }) {
-  return (
-    <span className='font-medium text-violet-600 dark:text-violet-300'>
-      {props.children}
-    </span>
-  )
+  return <span className='text-foreground font-medium'>{props.children}</span>
 }
 
 function Muted(props: { children: ReactNode }) {
