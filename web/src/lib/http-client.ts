@@ -68,12 +68,41 @@ api.get = ((url: string, config: ApiRequestConfig = {}) => {
   return request
 }) as typeof api.get
 
-function redirectToSignIn(): void {
+const PUBLIC_PATHS_AFTER_AUTH_LOSS = [
+  '/',
+  '/sign-in',
+  '/sign-up',
+  '/register',
+  '/forgot-password',
+  '/reset-password',
+  '/oauth',
+  '/privacy-policy',
+  '/user-agreement',
+  '/about',
+  '/setup',
+  '/pricing',
+  '/rankings',
+]
+
+export function isPublicPathAfterAuthLoss(pathname: string): boolean {
+  const path = pathname.split('?')[0]?.split('#')[0] || '/'
+  if (path === '/') return true
+  return PUBLIC_PATHS_AFTER_AUTH_LOSS.some(
+    (prefix) => prefix !== '/' && (path === prefix || path.startsWith(`${prefix}/`))
+  )
+}
+
+function handleLostSession(hadSession: boolean, skipErrorHandler?: boolean): void {
+  if (!hadSession) return
   if (
     typeof window !== 'undefined' &&
-    window.location.pathname !== '/sign-in'
+    isPublicPathAfterAuthLoss(window.location.pathname)
   ) {
-    window.location.replace('/sign-in')
+    return
+  }
+  if (!skipErrorHandler) toast.error(t('Session expired!'))
+  if (typeof window !== 'undefined' && window.location.pathname !== '/') {
+    window.location.replace('/')
   }
 }
 
@@ -103,6 +132,7 @@ api.interceptors.response.use(
     const status = error?.response?.status
 
     if (status === 401) {
+      const hadSession = Boolean(useAuthStore.getState().auth.accessToken)
       if (config && !config.skipAuthRefresh && !config.authRetry) {
         config.authRetry = true
         const outcome = await refreshAuthentication()
@@ -118,14 +148,12 @@ api.interceptors.response.use(
         }
 
         if (outcome.kind === 'anonymous' || outcome.kind === 'out_of_sync') {
-          if (!skipErrorHandler) toast.error(t('Session expired!'))
-          redirectToSignIn()
+          handleLostSession(hadSession, skipErrorHandler)
         }
       } else if (config?.authRetry) {
         clearAuthentication(false)
-        if (!skipErrorHandler) toast.error(t('Session expired!'))
-        redirectToSignIn()
-      } else if (!skipErrorHandler) {
+        handleLostSession(hadSession, skipErrorHandler)
+      } else if (!skipErrorHandler && hadSession) {
         toast.error(t('Session expired!'))
       }
     } else if (!skipErrorHandler) {
