@@ -41,6 +41,7 @@ import { SettingsSection } from '../components/settings-section'
 import { useUpdateOption } from '../hooks/use-update-option'
 import {
   SIDEBAR_MODULES_DEFAULT,
+  SIDEBAR_SECTION_ORDER,
   type SidebarModulesAdminConfig,
   serializeSidebarModulesAdmin,
 } from './config'
@@ -71,15 +72,21 @@ export function SidebarModulesSection({
     },
     console: {
       title: t('Console area'),
-      description: t('Dashboards, tokens, and usage analytics.'),
+      description: t('Dashboard, API keys, and usage logs.'),
     },
     personal: {
       title: t('Personal area'),
-      description: t('Wallet management and personal preferences.'),
+      description: t('Wallet in the sidebar and profile in the account menu.'),
     },
     admin: {
       title: t('Admin area'),
-      description: t('Global configuration and administrative tools.'),
+      description: t('Channels, models, users, and other daily operations.'),
+    },
+    'system-settings': {
+      title: t('System Settings'),
+      description: t(
+        'Site, billing, routing, security, console display, and operations.'
+      ),
     },
   }
 
@@ -103,7 +110,7 @@ export function SidebarModulesSection({
         description: t('Aggregated usage metrics and trend charts.'),
       },
       token: {
-        title: t('Token management'),
+        title: t('API Keys'),
         description: t('Create, revoke, and audit API tokens.'),
       },
       log: {
@@ -122,11 +129,11 @@ export function SidebarModulesSection({
     personal: {
       topup: {
         title: t('Wallet'),
-        description: t('Top up balance and view billing history.'),
+        description: t('Shown in the main sidebar for balance and billing.'),
       },
       personal: {
         title: t('Profile'),
-        description: t('Personal settings and profile management.'),
+        description: t('Account menu profile page.'),
       },
     },
     admin: {
@@ -136,23 +143,27 @@ export function SidebarModulesSection({
       },
       models: {
         title: t('Models'),
-        description: t('Manage catalog visibility and pricing.'),
+        description: t('Manage catalog, pricing, and deployments.'),
       },
       redemption: {
-        title: t('Redeem codes'),
+        title: t('Redemption Codes'),
         description: t('Create and review invite or credit codes.'),
       },
       user: {
         title: t('Users'),
         description: t('Administer user accounts and roles.'),
       },
-      setting: {
-        title: t('System settings'),
-        description: t('Advanced platform configuration.'),
-      },
       subscription: {
-        title: t('Subscription Management'),
+        title: t('Subscriptions'),
         description: t('Manage subscription plans and pricing.'),
+      },
+    },
+    'system-settings': {
+      setting: {
+        title: t('System Settings'),
+        description: t(
+          'Site, billing, routing, security, console display, and operations.'
+        ),
       },
     },
   }
@@ -182,7 +193,9 @@ export function SidebarModulesSection({
     form.reset(SIDEBAR_MODULES_DEFAULT)
   }
 
-  const sections = Object.entries(config)
+  const sections = SIDEBAR_SECTION_ORDER.filter(
+    (sectionKey) => config[sectionKey]
+  ).map((sectionKey) => [sectionKey, config[sectionKey]] as const)
 
   return (
     <SettingsSection title={t('Sidebar modules')}>
@@ -200,9 +213,15 @@ export function SidebarModulesSection({
               title: toTitleCase(sectionKey),
               description: t('Custom sidebar section'),
             }
-            const modules = Object.entries(sectionConfig).filter(
-              ([moduleKey]) => moduleKey !== 'enabled'
-            )
+            const knownModules = moduleMeta[sectionKey] ?? {}
+            const modules =
+              sectionKey === 'system-settings'
+                ? []
+                : Object.entries(sectionConfig).filter(
+                    ([moduleKey]) =>
+                      moduleKey !== 'enabled' &&
+                      knownModules[moduleKey] != null
+                  )
 
             return (
               <SettingsControlGroup key={sectionKey}>
@@ -221,13 +240,25 @@ export function SidebarModulesSection({
                       <FormControl>
                         <Switch
                           checked={Boolean(field.value)}
-                          onCheckedChange={field.onChange}
+                          onCheckedChange={(checked) => {
+                            field.onChange(checked)
+                            if (sectionKey === 'system-settings') {
+                              const current =
+                                form.getValues('system-settings') ?? {}
+                              form.setValue('system-settings', {
+                                ...current,
+                                enabled: Boolean(checked),
+                                setting: Boolean(checked),
+                              })
+                            }
+                          }}
                         />
                       </FormControl>
                     </SettingsSwitchItem>
                   )}
                 />
 
+                {modules.length === 0 ? null : (
                 <SettingsControlChildren className='grid gap-3 md:grid-cols-2'>
                   {modules.map(([moduleKey]) => {
                     const moduleInfo = moduleMeta[sectionKey]?.[moduleKey] ?? {
@@ -264,6 +295,7 @@ export function SidebarModulesSection({
                     )
                   })}
                 </SettingsControlChildren>
+                )}
               </SettingsControlGroup>
             )
           })}

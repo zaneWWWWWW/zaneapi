@@ -127,7 +127,7 @@ export function SecureVerificationDialog({
     >
       {availableTabs.length === 0 ? (
         <div className='grid place-items-center gap-4 text-center'>
-          <div className='bg-muted flex h-16 w-16 items-center justify-center rounded-2xl'>
+          <div className='bg-muted flex h-16 w-16 items-center justify-center rounded-lg'>
             <ShieldCheck className='text-muted-foreground h-8 w-8' />
           </div>
           <p className='text-muted-foreground text-sm'>

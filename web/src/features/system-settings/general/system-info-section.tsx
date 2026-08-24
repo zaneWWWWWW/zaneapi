@@ -17,10 +17,12 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 For commercial licensing, please contact support@quantumnous.com
 */
 import { zodResolver } from '@hookform/resolvers/zod'
+import { useMemo } from 'react'
 import type { Resolver } from 'react-hook-form'
 import { useTranslation } from 'react-i18next'
 import * as z from 'zod'
 
+import { Checkbox } from '@/components/ui/checkbox'
 import {
   Form,
   FormControl,
@@ -52,6 +54,7 @@ const _systemInfoSchema = z.object({
   Footer: z.string().optional(),
   About: z.string().optional(),
   HomePageContent: z.string().optional(),
+  HomePageDisplayedGroups: z.string().optional(),
   legal: z.object({
     user_agreement: z.string().optional(),
     privacy_policy: z.string().optional(),
@@ -62,6 +65,32 @@ type SystemInfoFormValues = z.infer<typeof _systemInfoSchema>
 
 type SystemInfoSectionProps = {
   defaultValues: SystemInfoFormValues
+  groupRatio?: string
+  userUsableGroups?: string
+}
+
+function parseJsonRecord(value: string | undefined): Record<string, unknown> {
+  if (!value) return {}
+  try {
+    const parsed = JSON.parse(value) as unknown
+    if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+      return parsed as Record<string, unknown>
+    }
+  } catch {
+    return {}
+  }
+  return {}
+}
+
+function parseGroupNameList(value: string | undefined): string[] {
+  if (!value) return []
+  try {
+    const parsed = JSON.parse(value) as unknown
+    if (!Array.isArray(parsed)) return []
+    return parsed.filter((item): item is string => typeof item === 'string')
+  } catch {
+    return []
+  }
 }
 
 function normalizeValue(value: unknown): string {
@@ -69,7 +98,8 @@ function normalizeValue(value: unknown): string {
   return typeof value === 'string' ? value : String(value)
 }
 
-export function SystemInfoSection({ defaultValues }: SystemInfoSectionProps) {
+export function SystemInfoSection(props: SystemInfoSectionProps) {
+  const defaultValues = props.defaultValues
   const { t } = useTranslation()
   const updateOption = useUpdateOption()
 
@@ -80,6 +110,9 @@ export function SystemInfoSection({ defaultValues }: SystemInfoSectionProps) {
     Footer: normalizeValue(defaultValues.Footer),
     About: normalizeValue(defaultValues.About),
     HomePageContent: normalizeValue(defaultValues.HomePageContent),
+    HomePageDisplayedGroups: normalizeValue(
+      defaultValues.HomePageDisplayedGroups
+    ) || '[]',
     legal: {
       user_agreement: normalizeValue(defaultValues.legal?.user_agreement),
       privacy_policy: normalizeValue(defaultValues.legal?.privacy_policy),
@@ -95,11 +128,27 @@ export function SystemInfoSection({ defaultValues }: SystemInfoSectionProps) {
     Footer: z.string().optional(),
     About: z.string().optional(),
     HomePageContent: z.string().optional(),
+    HomePageDisplayedGroups: z.string().optional(),
     legal: z.object({
       user_agreement: z.string().optional(),
       privacy_policy: z.string().optional(),
     }),
   })
+
+  const availableGroups = useMemo(() => {
+    const ratioMap = parseJsonRecord(props.groupRatio)
+    const usableMap = parseJsonRecord(props.userUsableGroups)
+    return Object.keys(ratioMap).map((name) => {
+      const rawRatio = ratioMap[name]
+      const ratio = typeof rawRatio === 'number' ? rawRatio : Number(rawRatio)
+      const description = usableMap[name]
+      return {
+        name,
+        description: typeof description === 'string' ? description : name,
+        ratio: Number.isFinite(ratio) ? ratio : 1,
+      }
+    })
+  }, [props.groupRatio, props.userUsableGroups])
 
   const { form, handleSubmit, handleReset, isDirty, isSubmitting } =
     useSettingsForm<SystemInfoFormValues>({
@@ -127,7 +176,7 @@ export function SystemInfoSection({ defaultValues }: SystemInfoSectionProps) {
     <>
       <FormNavigationGuard when={isDirty} />
 
-      <SettingsSection title={t('System Information')}>
+      <SettingsSection title={t('Site identity')}>
         <Form {...form}>
           <SettingsForm onSubmit={handleSubmit}>
             <SettingsPageFormActions
@@ -264,6 +313,71 @@ export function SystemInfoSection({ defaultValues }: SystemInfoSectionProps) {
                       <FormMessage />
                     </FormItem>
                   )}
+                />
+              </SettingsFormGridItem>
+
+              <SettingsFormGridItem span='full'>
+                <FormField
+                  control={form.control}
+                  name='HomePageDisplayedGroups'
+                  render={({ field }) => {
+                    const selected = parseGroupNameList(field.value)
+                    return (
+                      <FormItem>
+                        <FormLabel>
+                          {t('Homepage group ratio display')}
+                        </FormLabel>
+                        <FormDescription>
+                          {t(
+                            'Choose which group ratios appear in the homepage slider. Leave all unchecked to hide the slider.'
+                          )}
+                        </FormDescription>
+                        {availableGroups.length === 0 ? (
+                          <p className='text-muted-foreground text-sm'>
+                            {t('No groups configured')}
+                          </p>
+                        ) : (
+                          <div className='mt-3 grid gap-2 sm:grid-cols-2'>
+                            {availableGroups.map((group) => {
+                              const checked = selected.includes(group.name)
+                              return (
+                                <label
+                                  key={group.name}
+                                  className='border-border hover:bg-muted/30 flex cursor-pointer items-start gap-3 rounded-lg border px-3 py-2.5'
+                                >
+                                  <Checkbox
+                                    checked={checked}
+                                    className='mt-0.5'
+                                    onCheckedChange={(nextChecked) => {
+                                      const enabled = nextChecked === true
+                                      let next = selected
+                                      if (enabled && !checked) {
+                                        next = [...selected, group.name]
+                                      } else if (!enabled && checked) {
+                                        next = selected.filter(
+                                          (name) => name !== group.name
+                                        )
+                                      }
+                                      field.onChange(JSON.stringify(next))
+                                    }}
+                                  />
+                                  <span className='min-w-0 flex-1'>
+                                    <span className='block text-sm font-medium'>
+                                      {group.description}
+                                    </span>
+                                    <span className='text-muted-foreground block font-mono text-xs'>
+                                      {group.name} · {group.ratio}x
+                                    </span>
+                                  </span>
+                                </label>
+                              )
+                            })}
+                          </div>
+                        )}
+                        <FormMessage />
+                      </FormItem>
+                    )
+                  }}
                 />
               </SettingsFormGridItem>
 

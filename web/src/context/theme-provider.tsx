@@ -27,13 +27,12 @@ import {
 
 import { getCookie, setCookie, removeCookie } from '@/lib/cookies'
 
-type Theme = 'dark' | 'light' | 'system'
-type ResolvedTheme = Exclude<Theme, 'system'>
+type Theme = 'dark' | 'light'
+type ResolvedTheme = Theme
 
-const DEFAULT_THEME = 'system'
+const DEFAULT_THEME = 'light'
 const THEME_COOKIE_NAME = 'vite-ui-theme'
 const THEME_COOKIE_MAX_AGE = 60 * 60 * 24 * 365 // 1 year
-const THEMES = new Set<Theme>(['dark', 'light', 'system'])
 
 type ThemeProviderProps = {
   children: React.ReactNode
@@ -59,20 +58,12 @@ const initialState: ThemeProviderState = {
 
 const ThemeContext = createContext<ThemeProviderState>(initialState)
 
-function getSystemTheme(): ResolvedTheme {
-  if (typeof window === 'undefined') return 'light'
-  return window.matchMedia('(prefers-color-scheme: dark)').matches
-    ? 'dark'
-    : 'light'
-}
-
-function resolveTheme(theme: Theme): ResolvedTheme {
-  return theme === 'system' ? getSystemTheme() : theme
-}
-
 function getStoredTheme(storageKey: string, fallback: Theme): Theme {
-  const storedTheme = getCookie(storageKey) as Theme | undefined
-  return storedTheme && THEMES.has(storedTheme) ? storedTheme : fallback
+  const storedTheme = getCookie(storageKey)
+  if (storedTheme === 'dark' || storedTheme === 'light') {
+    return storedTheme
+  }
+  return fallback
 }
 
 export function ThemeProvider({
@@ -85,25 +76,14 @@ export function ThemeProvider({
     getStoredTheme(storageKey, defaultTheme)
   )
   const [resolvedTheme, setResolvedTheme] = useState<ResolvedTheme>(() =>
-    resolveTheme(getStoredTheme(storageKey, defaultTheme))
+    getStoredTheme(storageKey, defaultTheme)
   )
 
   useEffect(() => {
     const root = window.document.documentElement
-    const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)')
-
-    const applyTheme = () => {
-      const nextResolvedTheme = theme === 'system' ? getSystemTheme() : theme
-      root.classList.remove('light', 'dark')
-      root.classList.add(nextResolvedTheme)
-      setResolvedTheme(nextResolvedTheme)
-    }
-
-    applyTheme()
-
-    mediaQuery.addEventListener('change', applyTheme)
-
-    return () => mediaQuery.removeEventListener('change', applyTheme)
+    root.classList.remove('light', 'dark')
+    root.classList.add(theme)
+    setResolvedTheme(theme)
   }, [theme])
 
   const setTheme = useCallback(

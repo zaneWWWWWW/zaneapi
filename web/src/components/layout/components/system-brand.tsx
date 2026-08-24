@@ -33,8 +33,8 @@ type SystemBrandProps = {
   defaultVersion?: string
   /**
    * Visual layout:
-   * - 'sidebar': stacked card style (used inside the sidebar header).
-   * - 'inline': compact horizontal pill (used inside the top app bar).
+   * - 'sidebar': stacked card style.
+   * - 'inline': compact horizontal mark used in the connected sidebar header.
    */
   variant?: 'sidebar' | 'inline'
 }
@@ -42,8 +42,8 @@ type SystemBrandProps = {
 /**
  * System brand component
  * Displays current system logo + name.
- * - inline: compact pill in the top app bar; clicking navigates to home (/)
- * - sidebar: stacked card in the sidebar header (display only)
+ * - inline: compact mark in the sidebar header; clicking navigates to home (/)
+ * - sidebar: stacked card (display only)
  */
 export function SystemBrand(props: SystemBrandProps) {
   const { t } = useTranslation()
@@ -72,7 +72,9 @@ export function SystemBrand(props: SystemBrandProps) {
             className='size-full rounded-md object-cover'
           />
         </div>
-        <span className='max-w-[12rem] truncate'>{name}</span>
+        <span className='max-w-[12rem] truncate group-data-[collapsible=icon]:hidden'>
+          {name}
+        </span>
       </Link>
     )
   }

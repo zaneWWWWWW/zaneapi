@@ -113,11 +113,20 @@ export type SiteSettings = {
   Footer: string
   About: string
   HomePageContent: string
+  HomePageDisplayedGroups: string
+  GroupRatio: string
+  UserUsableGroups: string
   ServerAddress: string
   'legal.user_agreement': string
   'legal.privacy_policy': string
   HeaderNavModules: string
   SidebarModulesAdmin: string
+  'console_setting.announcements': string
+  'console_setting.announcements_enabled': boolean
+  'console_setting.faq': string
+  'console_setting.faq_enabled': boolean
+  'console_setting.api_info': string
+  'console_setting.api_info_enabled': boolean
 }
 
 export type AuthSettings = {
@@ -166,13 +175,7 @@ export type AuthSettings = {
 }
 
 export type ContentSettings = {
-  'console_setting.api_info': string
-  'console_setting.announcements': string
-  'console_setting.faq': string
   'console_setting.uptime_kuma_groups': string
-  'console_setting.api_info_enabled': boolean
-  'console_setting.announcements_enabled': boolean
-  'console_setting.faq_enabled': boolean
   'console_setting.uptime_kuma_enabled': boolean
   DataExportEnabled: boolean
   DataExportDefaultTime: string
@@ -444,11 +447,30 @@ export type TestResult = {
   error?: string
 }
 
+export type CatalogDifference = {
+  model_name: string
+  provider?: string
+  enabled: boolean
+  current?: {
+    exists: boolean
+    provider?: string
+    enabled: boolean
+  }
+}
+
+export type ToolPriceDifference = {
+  key: string
+  current: number | null
+  upstream: number
+}
+
 export type UpstreamRatiosResponse = {
   success: boolean
   message: string
   data: {
     differences: DifferencesMap
     test_results: TestResult[]
+    catalog_differences?: CatalogDifference[]
+    tool_price_differences?: ToolPriceDifference[]
   }
 }

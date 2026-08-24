@@ -18,20 +18,21 @@ For commercial licensing, please contact support@quantumnous.com
 */
 import { useNavigate } from '@tanstack/react-router'
 import {
+  BookOpen,
   Check,
+  ChevronRight,
+  Info,
   Languages,
-  LayoutDashboard,
   LogOut,
   Moon,
   Sun,
   User,
 } from 'lucide-react'
-import { useCallback, useMemo } from 'react'
+import { useCallback, useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
 import { SignOutDialog } from '@/components/sign-out-dialog'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
-import { Button } from '@/components/ui/button'
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -42,8 +43,9 @@ import {
   DropdownMenuSubTrigger,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
+import { useSidebar } from '@/components/ui/sidebar'
 import { useTheme } from '@/context/theme-provider'
-import useDialogState from '@/hooks/use-dialog'
+import { useStatus } from '@/hooks/use-status'
 import { useUserDisplay } from '@/hooks/use-user-display'
 import {
   INTERFACE_LANGUAGE_OPTIONS,
@@ -51,17 +53,38 @@ import {
 } from '@/i18n/languages'
 import { api } from '@/lib/api'
 import { getUserAvatarFallback, getUserAvatarStyle } from '@/lib/avatar'
+import { parseHeaderNavModulesFromStatus } from '@/lib/nav-modules'
 import { cn } from '@/lib/utils'
 import { useAuthStore } from '@/stores/auth-store'
 
 const avatarFallbackClassName = 'font-semibold text-white'
 
-export function ProfileDropdown() {
+export function SidebarAccount() {
   const { i18n, t } = useTranslation()
   const navigate = useNavigate()
-  const [open, setOpen] = useDialogState()
+  const { isMobile, state } = useSidebar()
+  const [signOutOpen, setSignOutOpen] = useState(false)
+  const { theme, setTheme } = useTheme()
   const user = useAuthStore((state) => state.auth.user)
+  const { displayName } = useUserDisplay(user)
+  const { status } = useStatus()
   const currentLanguage = normalizeInterfaceLanguage(i18n.language)
+  const collapsed = !isMobile && state === 'collapsed'
+  const navModules = parseHeaderNavModulesFromStatus(
+    status as Record<string, unknown> | null
+  )
+  const docsLink = status?.docs_link as string | undefined
+  const showDocs = navModules.docs !== false
+  const showAbout = navModules.about !== false
+
+  const handleOpenDocs = useCallback(() => {
+    if (docsLink) {
+      window.open(docsLink, '_blank', 'noopener,noreferrer')
+      return
+    }
+    window.location.assign('/docs')
+  }, [docsLink])
+
   const handleChangeLanguage = useCallback(
     async (code: string) => {
       await i18n.changeLanguage(code)
@@ -75,8 +98,7 @@ export function ProfileDropdown() {
     },
     [i18n, user]
   )
-  const { displayName, roleLabel } = useUserDisplay(user)
-  const { theme, setTheme } = useTheme()
+
   const avatarName = user?.username || displayName
   const avatarFallback = getUserAvatarFallback(avatarName)
   const avatarFallbackStyle = useMemo(
@@ -89,10 +111,18 @@ export function ProfileDropdown() {
       <DropdownMenu modal={false}>
         <DropdownMenuTrigger
           render={
-            <Button variant='ghost' className='relative size-8 rounded-full p-0' />
+            <button
+              type='button'
+              className={cn(
+                'hover:bg-sidebar-accent hover:text-sidebar-accent-foreground flex w-full items-center gap-2 rounded-lg p-2 text-left outline-none',
+                'focus-visible:ring-sidebar-ring focus-visible:ring-2',
+                collapsed && 'size-9 justify-center p-0'
+              )}
+              aria-label={t('Personal account')}
+            />
           }
         >
-          <Avatar className='size-8'>
+          <Avatar className='size-7 shrink-0'>
             <AvatarFallback
               className={`${avatarFallbackClassName} text-[11px]`}
               style={avatarFallbackStyle}
@@ -100,8 +130,27 @@ export function ProfileDropdown() {
               {avatarFallback}
             </AvatarFallback>
           </Avatar>
+          <span className={cn('min-w-0 flex-1', collapsed && 'hidden')}>
+            <span className='text-sidebar-foreground block truncate text-sm font-medium'>
+              {displayName}
+            </span>
+            <span className='text-muted-foreground block truncate text-xs'>
+              {t('Personal account')}
+            </span>
+          </span>
+          <ChevronRight
+            className={cn(
+              'text-muted-foreground size-4 shrink-0',
+              collapsed && 'hidden'
+            )}
+          />
         </DropdownMenuTrigger>
-        <DropdownMenuContent align='end' sideOffset={8} className='w-56'>
+        <DropdownMenuContent
+          side='top'
+          align='start'
+          sideOffset={8}
+          className='w-60'
+        >
           <div className='flex items-center gap-2 px-1.5 py-1.5'>
             <Avatar className='size-8'>
               <AvatarFallback
@@ -111,39 +160,22 @@ export function ProfileDropdown() {
                 {avatarFallback}
               </AvatarFallback>
             </Avatar>
-            <div className='flex flex-1 flex-col gap-0.5 overflow-hidden'>
+            <div className='min-w-0 flex-1'>
               <p className='text-foreground truncate text-sm font-medium'>
                 {displayName}
               </p>
-              <div className='flex items-center gap-1.5'>
-                <span className='text-muted-foreground text-xs'>
-                  {roleLabel}
-                </span>
-                {user?.group && (
-                  <>
-                    <span className='text-muted-foreground text-xs'>·</span>
-                    <span className='text-muted-foreground truncate text-xs'>
-                      {String(user.group)}
-                    </span>
-                  </>
-                )}
-              </div>
+              <p className='text-muted-foreground truncate text-xs'>
+                {t('Personal account')}
+              </p>
             </div>
           </div>
 
           <DropdownMenuSeparator />
 
-          <DropdownMenuItem onClick={() => navigate({ to: '/dashboard' })}>
-            <LayoutDashboard className='size-4' />
-            {t('Go to Dashboard')}
-          </DropdownMenuItem>
-
           <DropdownMenuItem onClick={() => navigate({ to: '/profile' })}>
             <User className='size-4' />
             {t('Profile')}
           </DropdownMenuItem>
-
-          <DropdownMenuSeparator />
 
           <DropdownMenuSub>
             <DropdownMenuSubTrigger>
@@ -198,16 +230,37 @@ export function ProfileDropdown() {
             </DropdownMenuSubContent>
           </DropdownMenuSub>
 
+          {(showDocs || showAbout) && (
+            <>
+              <DropdownMenuSeparator />
+              {showDocs && (
+                <DropdownMenuItem onClick={handleOpenDocs}>
+                  <BookOpen className='size-4' />
+                  {t('Docs')}
+                </DropdownMenuItem>
+              )}
+              {showAbout && (
+                <DropdownMenuItem onClick={() => navigate({ to: '/about' })}>
+                  <Info className='size-4' />
+                  {t('About')}
+                </DropdownMenuItem>
+              )}
+            </>
+          )}
+
           <DropdownMenuSeparator />
 
-          <DropdownMenuItem variant='destructive' onClick={() => setOpen(true)}>
+          <DropdownMenuItem
+            variant='destructive'
+            onClick={() => setSignOutOpen(true)}
+          >
             <LogOut className='size-4' />
             {t('Sign out')}
           </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
 
-      <SignOutDialog open={!!open} onOpenChange={setOpen} />
+      <SignOutDialog open={!!signOutOpen} onOpenChange={setSignOutOpen} />
     </>
   )
 }

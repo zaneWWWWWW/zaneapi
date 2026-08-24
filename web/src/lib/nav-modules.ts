@@ -22,6 +22,16 @@ export type ModuleAccess = { enabled: boolean; requireAuth: boolean }
 
 export type HeaderNavModule = 'rankings' | 'pricing'
 
+export function isGuestAllowedAppPath(pathname: string): boolean {
+  const path = pathname.split('?')[0]?.split('#')[0] || '/'
+  return (
+    path === '/pricing' ||
+    path.startsWith('/pricing/') ||
+    path === '/rankings' ||
+    path.startsWith('/rankings/')
+  )
+}
+
 export type HeaderNavModules = {
   home: boolean
   console: boolean

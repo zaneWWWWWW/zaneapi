@@ -17,14 +17,25 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 For commercial licensing, please contact support@quantumnous.com
 */
 import { AnimatePresence, motion, useReducedMotion } from 'motion/react'
+import { Fragment } from 'react'
 
-import { Sidebar, SidebarContent, SidebarRail } from '@/components/ui/sidebar'
+import {
+  Sidebar,
+  SidebarContent,
+  SidebarFooter,
+  SidebarHeader,
+  SidebarRail,
+  SidebarSeparator,
+  SidebarTrigger,
+} from '@/components/ui/sidebar'
 import { useLayout } from '@/context/layout-provider'
 import { useSidebarView } from '@/hooks/use-sidebar-view'
 import { MOTION_TRANSITION, MOTION_VARIANTS } from '@/lib/motion'
 
 import { NavGroup } from './nav-group'
+import { SidebarAccount } from './sidebar-account'
 import { SidebarViewHeader } from './sidebar-view-header'
+import { SystemBrand } from './system-brand'
 
 /**
  * Application sidebar.
@@ -50,6 +61,12 @@ export function AppSidebar() {
 
   return (
     <Sidebar collapsible={collapsible} variant={variant}>
+      <SidebarHeader className='h-[var(--app-header-height)] justify-center px-2 py-1.5'>
+        <div className='flex min-w-0 items-center justify-between gap-1'>
+          <SystemBrand variant='inline' />
+          <SidebarTrigger className='shrink-0 group-data-[collapsible=icon]:hidden' />
+        </div>
+      </SidebarHeader>
       {view && <SidebarViewHeader view={view} />}
 
       <SidebarContent className='py-2'>
@@ -64,13 +81,19 @@ export function AppSidebar() {
             transition={MOTION_TRANSITION.fast}
             className='flex flex-col'
           >
-            {navGroups.map((props) => (
-              <NavGroup key={props.id || props.title} {...props} />
+            {navGroups.map((props, index) => (
+              <Fragment key={props.id || props.title || String(index)}>
+                {index > 0 ? <SidebarSeparator className='mx-2' /> : null}
+                <NavGroup {...props} />
+              </Fragment>
             ))}
           </motion.div>
         </AnimatePresence>
       </SidebarContent>
 
+      <SidebarFooter className='border-sidebar-border border-t p-2'>
+        <SidebarAccount />
+      </SidebarFooter>
       <SidebarRail />
     </Sidebar>
   )

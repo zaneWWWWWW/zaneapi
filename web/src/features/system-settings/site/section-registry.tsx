@@ -16,6 +16,9 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 For commercial licensing, please contact support@quantumnous.com
 */
+import { AnnouncementsSection } from '../content/announcements-section'
+import { ApiInfoSection } from '../content/api-info-section'
+import { FAQSection } from '../content/faq-section'
 import { SystemInfoSection } from '../general/system-info-section'
 import {
   parseHeaderNavModules,
@@ -32,7 +35,7 @@ import { createSectionRegistry } from '../utils/section-registry'
 const SITE_SECTIONS = [
   {
     id: 'system-info',
-    titleKey: 'System Information',
+    titleKey: 'Site identity',
     build: (settings: SiteSettings) => (
       <SystemInfoSection
         defaultValues={{
@@ -41,12 +44,15 @@ const SITE_SECTIONS = [
           Footer: settings.Footer,
           About: settings.About,
           HomePageContent: settings.HomePageContent,
+          HomePageDisplayedGroups: settings.HomePageDisplayedGroups,
           ServerAddress: settings.ServerAddress,
           legal: {
             user_agreement: settings['legal.user_agreement'],
             privacy_policy: settings['legal.privacy_policy'],
           },
         }}
+        groupRatio={settings.GroupRatio}
+        userUsableGroups={settings.UserUsableGroups}
       />
     ),
   },
@@ -58,8 +64,38 @@ const SITE_SECTIONS = [
     ),
   },
   {
+    id: 'announcements',
+    titleKey: 'Announcements',
+    build: (settings: SiteSettings) => (
+      <AnnouncementsSection
+        enabled={settings['console_setting.announcements_enabled']}
+        data={settings['console_setting.announcements']}
+      />
+    ),
+  },
+  {
+    id: 'faq',
+    titleKey: 'FAQ',
+    build: (settings: SiteSettings) => (
+      <FAQSection
+        enabled={settings['console_setting.faq_enabled']}
+        data={settings['console_setting.faq']}
+      />
+    ),
+  },
+  {
+    id: 'api-info',
+    titleKey: 'API Addresses',
+    build: (settings: SiteSettings) => (
+      <ApiInfoSection
+        enabled={settings['console_setting.api_info_enabled']}
+        data={settings['console_setting.api_info']}
+      />
+    ),
+  },
+  {
     id: 'header-navigation',
-    titleKey: 'Header navigation',
+    titleKey: 'Explore pages',
     build: (settings: SiteSettings) => {
       const headerNavConfig = parseHeaderNavModules(settings.HeaderNavModules)
       const headerNavSerialized = serializeHeaderNavModules(headerNavConfig)

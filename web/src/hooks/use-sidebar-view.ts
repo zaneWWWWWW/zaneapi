@@ -55,11 +55,31 @@ export function useSidebarView(): ResolvedSidebarView {
     const role = userRole ?? ROLE.GUEST
     const isAdmin = role >= ROLE.ADMIN
     return configFilteredRoot
-      .filter((group) => (group.id === 'admin' ? isAdmin : true))
+      .filter((group) =>
+        group.id === 'admin' || group.id === 'system-settings' ? isAdmin : true
+      )
       .map((group) => {
-        const items = group.items.filter(
-          (item) => item.requiredRole === undefined || role >= item.requiredRole
-        )
+        const items = group.items
+          .map((item) => {
+            if (!('items' in item) || !item.items) return item
+            const nested = item.items.filter(
+              (subItem) =>
+                subItem.requiredRole === undefined ||
+                role >= subItem.requiredRole
+            )
+            return nested.length === item.items.length
+              ? item
+              : { ...item, items: nested }
+          })
+          .filter((item) => {
+            if (item.requiredRole !== undefined && role < item.requiredRole) {
+              return false
+            }
+            if ('items' in item && item.items && item.items.length === 0) {
+              return false
+            }
+            return true
+          })
         return items.length === group.items.length ? group : { ...group, items }
       })
   }, [configFilteredRoot, userRole])

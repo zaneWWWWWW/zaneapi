@@ -87,8 +87,8 @@ export function LoginSessionsCard() {
       )
       setRevokeTarget(null)
       if (revokedCurrent) {
+        await navigate({ to: '/', replace: true })
         clearAuthenticatedClientState(queryClient)
-        void navigate({ to: '/sign-in', replace: true })
         return
       }
       toast.success(t('Session signed out'))

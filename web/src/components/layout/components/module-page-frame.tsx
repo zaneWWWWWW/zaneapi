@@ -16,36 +16,36 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 For commercial licensing, please contact support@quantumnous.com
 */
-import { createFileRoute, Outlet, redirect } from '@tanstack/react-router'
-
-import { AuthenticatedLayout, PublicLayout } from '@/components/layout'
-import { isGuestAllowedAppPath } from '@/lib/nav-modules'
+import { PageTransition } from '@/components/page-transition'
+import { cn } from '@/lib/utils'
 import { useAuthStore } from '@/stores/auth-store'
 
-export const Route = createFileRoute('/_authenticated')({
-  beforeLoad: ({ location }) => {
-    const { auth } = useAuthStore.getState()
+type ModulePageFrameProps = {
+  children: React.ReactNode
+  className?: string
+  contentClassName?: string
+}
 
-    if (auth.user && auth.accessToken) return
-    if (isGuestAllowedAppPath(location.pathname)) return
-
-    throw redirect({
-      to: '/sign-in',
-      search: { redirect: location.href },
-    })
-  },
-  component: AuthenticatedRouteLayout,
-})
-
-function AuthenticatedRouteLayout() {
+export function ModulePageFrame(props: ModulePageFrameProps) {
   const user = useAuthStore((state) => state.auth.user)
-  if (user) {
-    return <AuthenticatedLayout />
-  }
 
   return (
-    <PublicLayout showMainContainer={false}>
-      <Outlet />
-    </PublicLayout>
+    <div
+      className={cn(
+        'relative',
+        user && 'min-h-0 flex-1 overflow-y-auto',
+        props.className
+      )}
+    >
+      <PageTransition
+        className={cn(
+          'relative mx-auto w-full px-3 pb-8 sm:px-6 sm:pb-10 xl:px-8',
+          user ? 'pt-4 sm:pt-6' : 'pt-16 sm:pt-20',
+          props.contentClassName
+        )}
+      >
+        {props.children}
+      </PageTransition>
+    </div>
   )
 }

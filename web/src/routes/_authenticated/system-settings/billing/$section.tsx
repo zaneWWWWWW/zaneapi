@@ -28,6 +28,13 @@ export const Route = createFileRoute(
   '/_authenticated/system-settings/billing/$section'
 )({
   beforeLoad: ({ params }) => {
+    if (params.section === 'model-pricing') {
+      throw redirect({
+        to: '/models/$section',
+        params: { section: 'metadata' },
+        search: { view: 'prices' },
+      })
+    }
     const validSections = BILLING_SECTION_IDS as unknown as string[]
     if (!validSections.includes(params.section)) {
       throw redirect({

@@ -78,9 +78,35 @@ export const SIDEBAR_MODULES_DEFAULT: SidebarModulesAdminConfig = {
     models: true,
     redemption: true,
     user: true,
-    setting: true,
     subscription: true,
   },
+  'system-settings': {
+    enabled: true,
+    setting: true,
+  },
+}
+
+export const SIDEBAR_SECTION_ORDER = [
+  'chat',
+  'console',
+  'personal',
+  'admin',
+  'system-settings',
+] as const
+
+export function migrateSidebarModulesAdmin(
+  config: SidebarModulesAdminConfig
+): SidebarModulesAdminConfig {
+  if (config['system-settings']) return config
+  const enabled =
+    config.admin?.enabled !== false && config.admin?.setting !== false
+  return {
+    ...config,
+    'system-settings': {
+      enabled,
+      setting: enabled,
+    },
+  }
 }
 
 const toBoolean = (value: unknown, fallback: boolean): boolean => {
@@ -215,21 +241,23 @@ export function parseSidebarModulesAdmin(
       result[sectionKey] = sectionConfig
     })
 
+    const migrated = migrateSidebarModulesAdmin(result)
+
     // Merge defaults to ensure expected sections exist
     Object.entries(defaults).forEach(([sectionKey, config]) => {
-      if (!result[sectionKey]) {
-        result[sectionKey] = { ...config }
+      if (!migrated[sectionKey]) {
+        migrated[sectionKey] = { ...config }
         return
       }
 
       Object.entries(config).forEach(([moduleKey, moduleValue]) => {
-        if (!(moduleKey in result[sectionKey])) {
-          result[sectionKey][moduleKey] = moduleValue
+        if (!(moduleKey in migrated[sectionKey])) {
+          migrated[sectionKey][moduleKey] = moduleValue
         }
       })
     })
 
-    return result
+    return migrated
   } catch {
     return defaults
   }

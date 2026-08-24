@@ -16,7 +16,7 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 For commercial licensing, please contact support@quantumnous.com
 */
-import { Monitor, Sun, MoonStar } from 'lucide-react'
+import { MoonStar, Sun } from 'lucide-react'
 import { motion } from 'motion/react'
 import { useTranslation } from 'react-i18next'
 
@@ -42,33 +42,6 @@ export function ThemeQuickSwitcher() {
           aria-labelledby='theme-switcher-label'
           className='border-muted/50 bg-muted/40 inline-flex w-auto items-center gap-1.5 rounded-lg border px-1.5 py-1'
         >
-          <Button
-            variant='ghost'
-            size='icon'
-            role='radio'
-            aria-label={t('System')}
-            aria-checked={theme === 'system'}
-            onClick={() => setTheme('system')}
-            className={cn(
-              'relative size-7',
-              theme === 'system' && 'text-accent-foreground'
-            )}
-          >
-            {theme === 'system' && (
-              <motion.span
-                layoutId='theme-switcher-active'
-                className='bg-accent ring-border absolute inset-0 rounded-md ring-1'
-                transition={{
-                  type: 'spring',
-                  stiffness: 500,
-                  damping: 30,
-                  mass: 0.2,
-                }}
-                animate={{ rotate: 360 }}
-              />
-            )}
-            <Monitor className='relative z-10 size-[0.95rem]' />
-          </Button>
           <Button
             variant='ghost'
             size='icon'

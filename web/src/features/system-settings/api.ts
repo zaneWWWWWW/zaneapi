@@ -105,3 +105,19 @@ export async function fetchUpstreamRatios(request: FetchUpstreamRatiosRequest) {
   )
   return res.data
 }
+
+export async function applyPriceAppleExtras(request: {
+  catalog: Array<{
+    model_name: string
+    provider?: string
+    enabled: boolean
+  }>
+  tool_prices: Record<string, number>
+}) {
+  const res = await api.post<{
+    success: boolean
+    message?: string
+    data?: { catalog_applied: number; tools_applied: number }
+  }>('/api/ratio_sync/apply_extras', request)
+  return res.data
+}

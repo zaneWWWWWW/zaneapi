@@ -35,8 +35,6 @@ export type TopNavLink = {
  * Generate top navigation links based on HeaderNavModules configuration from backend /api/status
  * Backend format example (stringified JSON):
  * {
- *   home: true,
- *   console: true,
  *   pricing: { enabled: true, requireAuth: false },
  *   rankings: { enabled: true, requireAuth: false },
  *   docs: true,
@@ -61,16 +59,6 @@ export function useTopNavLinks(): TopNavLink[] {
   const isAuthed = !!auth?.user
 
   const links: TopNavLink[] = []
-
-  // Home
-  if (modules?.home !== false) {
-    links.push({ title: t('Home'), href: '/' })
-  }
-
-  // Console -> /dashboard (new console path)
-  if (modules?.console !== false) {
-    links.push({ title: t('Console'), href: '/dashboard' })
-  }
 
   // Pricing
   const pricing = modules?.pricing

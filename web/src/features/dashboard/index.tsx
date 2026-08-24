@@ -243,13 +243,10 @@ export function Dashboard() {
     []
   )
 
-  const meta = SECTION_META[activeSection] ?? SECTION_META.overview
   const isAdmin = Boolean(userRole && userRole >= ROLE.ADMIN)
   const visibleSections = useMemo(
     () =>
-      DASHBOARD_SECTION_IDS.filter(
-        (section) => section !== 'overview' && (section !== 'users' || isAdmin)
-      ),
+      DASHBOARD_SECTION_IDS.filter((section) => section !== 'users' || isAdmin),
     [isAdmin]
   )
   const handleSectionChange = useCallback(
@@ -261,8 +258,6 @@ export function Dashboard() {
     },
     [navigate]
   )
-  const showSectionTabs =
-    activeSection !== 'overview' && visibleSections.length > 1
   const modelActions =
     activeSection === 'models' ? (
       <>
@@ -319,30 +314,22 @@ export function Dashboard() {
 
   return (
     <SectionPageLayout>
-      <SectionPageLayout.Title>{t(meta.titleKey)}</SectionPageLayout.Title>
+      <SectionPageLayout.Title>{t('Dashboard')}</SectionPageLayout.Title>
+      {sectionActions != null && (
+        <SectionPageLayout.Actions>{sectionActions}</SectionPageLayout.Actions>
+      )}
       <SectionPageLayout.Content>
         <div className='space-y-3 sm:space-y-4'>
-          {activeSection !== 'overview' && (
-            <div className='flex flex-wrap items-center justify-between gap-1.5 sm:gap-2'>
-              {showSectionTabs ? (
-                <Tabs value={activeSection} onValueChange={handleSectionChange}>
-                  <TabsList className='max-w-full flex-wrap justify-start group-data-horizontal/tabs:h-auto'>
-                    {visibleSections.map((section) => (
-                      <TabsTrigger key={section} value={section}>
-                        {t(SECTION_META[section].titleKey)}
-                      </TabsTrigger>
-                    ))}
-                  </TabsList>
-                </Tabs>
-              ) : (
-                <div />
-              )}
-              {sectionActions != null && (
-                <div className='flex shrink-0 flex-wrap items-center gap-1.5 sm:gap-2'>
-                  {sectionActions}
-                </div>
-              )}
-            </div>
+          {visibleSections.length > 1 && (
+            <Tabs value={activeSection} onValueChange={handleSectionChange}>
+              <TabsList className='max-w-full flex-wrap justify-start group-data-horizontal/tabs:h-auto'>
+                {visibleSections.map((section) => (
+                  <TabsTrigger key={section} value={section}>
+                    {t(SECTION_META[section].titleKey)}
+                  </TabsTrigger>
+                ))}
+              </TabsList>
+            </Tabs>
           )}
           {activeSection === 'overview' && <OverviewDashboard />}
           {activeSection === 'models' && (

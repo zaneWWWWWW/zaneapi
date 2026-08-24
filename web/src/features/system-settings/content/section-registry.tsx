@@ -18,12 +18,9 @@ For commercial licensing, please contact support@quantumnous.com
 */
 import type { ContentSettings } from '../types'
 import { createSectionRegistry } from '../utils/section-registry'
-import { AnnouncementsSection } from './announcements-section'
-import { ApiInfoSection } from './api-info-section'
 import { ChatSettingsSection } from './chat-settings-section'
 import { DashboardSection } from './dashboard-section'
 import { DrawingSettingsSection } from './drawing-settings-section'
-import { FAQSection } from './faq-section'
 import { UptimeKumaSection } from './uptime-kuma-section'
 
 /**
@@ -50,36 +47,6 @@ const CONTENT_SECTIONS = [
             settings.DataExportDefaultTime
           ),
         }}
-      />
-    ),
-  },
-  {
-    id: 'announcements',
-    titleKey: 'Announcements',
-    build: (settings: ContentSettings) => (
-      <AnnouncementsSection
-        enabled={settings['console_setting.announcements_enabled']}
-        data={settings['console_setting.announcements']}
-      />
-    ),
-  },
-  {
-    id: 'api-info',
-    titleKey: 'API Addresses',
-    build: (settings: ContentSettings) => (
-      <ApiInfoSection
-        enabled={settings['console_setting.api_info_enabled']}
-        data={settings['console_setting.api_info']}
-      />
-    ),
-  },
-  {
-    id: 'faq',
-    titleKey: 'FAQ',
-    build: (settings: ContentSettings) => (
-      <FAQSection
-        enabled={settings['console_setting.faq_enabled']}
-        data={settings['console_setting.faq']}
       />
     ),
   },

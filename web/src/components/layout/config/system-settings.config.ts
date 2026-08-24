@@ -16,10 +16,10 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 For commercial licensing, please contact support@quantumnous.com
 */
-import { type TFunction } from 'i18next'
+import type { TFunction } from 'i18next'
 import {
-  Box,
   CreditCard,
+  GitBranch,
   Layout,
   Settings,
   Shield,
@@ -34,58 +34,67 @@ import { getModelsSectionNavItems } from '@/features/system-settings/models/sect
 import { getOperationsSectionNavItems } from '@/features/system-settings/operations/section-registry.tsx'
 import { getSecuritySectionNavItems } from '@/features/system-settings/security/section-registry.tsx'
 import { getSiteSectionNavItems } from '@/features/system-settings/site/section-registry.tsx'
+import { ROLE } from '@/lib/roles'
 
-import type { NavGroup, SidebarView } from '../types'
+import type { NavGroup, NavItem, SidebarView } from '../types'
 
 /**
- * Sidebar nav groups for the System Settings nested view.
- *
- * Kept as a single group because the workspace title in the sidebar
- * header already provides top-level context — the inner group label
- * scopes the items as "administration" actions.
+ * System settings sections shown in their own sidebar group.
  */
+export function getSystemSettingsNavItems(t: TFunction): NavItem[] {
+  return [
+    {
+      title: t('Site & Branding'),
+      icon: Settings,
+      items: getSiteSectionNavItems(t),
+    },
+    {
+      title: t('Authentication'),
+      icon: Shield,
+      items: getAuthSectionNavItems(t),
+    },
+    {
+      title: t('Billing & Payment'),
+      icon: CreditCard,
+      items: getBillingSectionNavItems(t),
+    },
+    {
+      title: t('Routing & Reliability'),
+      icon: GitBranch,
+      items: getModelsSectionNavItems(t),
+    },
+    {
+      title: t('Security & Limits'),
+      icon: ShieldAlert,
+      items: getSecuritySectionNavItems(t),
+    },
+    {
+      title: t('Console display'),
+      icon: Layout,
+      url: '/system-settings/content/dashboard',
+      activeUrls: getContentSectionNavItems(t).map((item) => item.url),
+    },
+    {
+      title: t('Operations'),
+      icon: Wrench,
+      items: [
+        {
+          title: t('Runtime'),
+          url: '/system-info',
+          requiredRole: ROLE.SUPER_ADMIN,
+        },
+        ...getOperationsSectionNavItems(t),
+      ],
+    },
+  ]
+}
+
 function getSystemSettingsNavGroups(t: TFunction): NavGroup[] {
   return [
     {
       id: 'system-administration',
       title: t('System Administration'),
-      items: [
-        {
-          title: t('Site & Branding'),
-          icon: Settings,
-          items: getSiteSectionNavItems(t),
-        },
-        {
-          title: t('Authentication'),
-          icon: Shield,
-          items: getAuthSectionNavItems(t),
-        },
-        {
-          title: t('Billing & Payment'),
-          icon: CreditCard,
-          items: getBillingSectionNavItems(t),
-        },
-        {
-          title: t('Models & Routing'),
-          icon: Box,
-          items: getModelsSectionNavItems(t),
-        },
-        {
-          title: t('Security & Limits'),
-          icon: ShieldAlert,
-          items: getSecuritySectionNavItems(t),
-        },
-        {
-          title: t('Console Content'),
-          icon: Layout,
-          items: getContentSectionNavItems(t),
-        },
-        {
-          title: t('Operations'),
-          icon: Wrench,
-          items: getOperationsSectionNavItems(t),
-        },
-      ],
+      items: getSystemSettingsNavItems(t),
     },
   ]
 }

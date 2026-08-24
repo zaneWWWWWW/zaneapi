@@ -19,13 +19,6 @@ For commercial licensing, please contact support@quantumnous.com
 @import 'tailwindcss';
 @import 'tw-animate-css';
 @import 'shadcn/tailwind.css';
-@import '@fontsource-variable/public-sans';
-/* Editorial serif (Lora) backing the `serif` font axis and the Anthropic
- * preset's default typography. See `--font-serif` in theme.css for the
- * full Latin + CJK fallback stack and `theme-presets.css` for the cascade
- * that activates it. Loaded globally so font-switching is instantaneous
- * with no FOUT once the variable is fetched. */
-@import '@fontsource-variable/lora';
 
 @import './theme.css';
 @import './theme-presets.css';
@@ -470,12 +463,41 @@ For commercial licensing, please contact support@quantumnous.com
   animation: landing-fade-right 0.6s cubic-bezier(0.16, 1, 0.3, 1) both;
 }
 
+@keyframes homepage-group-marquee {
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(-50%);
+  }
+}
+
+.homepage-group-marquee-viewport {
+  overflow: hidden;
+  mask-image: linear-gradient(
+    to right,
+    transparent,
+    black 3rem,
+    black calc(100% - 3rem),
+    transparent
+  );
+}
+
+.homepage-group-marquee {
+  animation: homepage-group-marquee 30s linear infinite;
+}
+
+.homepage-group-marquee:hover {
+  animation-play-state: paused;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .landing-animate-fade-up,
   .landing-animate-fade-in,
   .landing-animate-scale-in,
   .landing-animate-fade-left,
-  .landing-animate-fade-right {
+  .landing-animate-fade-right,
+  .homepage-group-marquee {
     animation: none !important;
     opacity: 1 !important;
     transform: none !important;

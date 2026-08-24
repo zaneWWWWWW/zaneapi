@@ -18,7 +18,7 @@ For commercial licensing, please contact support@quantumnous.com
 */
 import { Link, useLocation } from '@tanstack/react-router'
 import { ChevronRight } from 'lucide-react'
-import { type ReactNode, useState, useEffect } from 'react'
+import { useEffect, useState, type ReactNode } from 'react'
 
 import { Badge } from '@/components/ui/badge'
 import {
@@ -48,11 +48,11 @@ import {
 } from '@/components/ui/sidebar'
 
 import { checkIsActive } from '../lib/url-utils'
-import {
-  type NavCollapsible,
-  type NavChatPresets,
-  type NavLink,
-  type NavGroup as NavGroupProps,
+import type {
+  NavCollapsible,
+  NavChatPresets,
+  NavLink,
+  NavGroup as NavGroupProps,
 } from '../types'
 import { ChatPresetsItem } from './chat-presets-item'
 
@@ -65,10 +65,12 @@ export function NavGroup({ title, items }: NavGroupProps) {
   const href = useLocation({ select: (location) => location.href })
 
   return (
-    <SidebarGroup className='px-2 py-1'>
-      <SidebarGroupLabel className='text-muted-foreground/70 px-2 text-[11px] font-medium tracking-wider uppercase'>
-        {title}
-      </SidebarGroupLabel>
+    <SidebarGroup className='px-2 py-1.5'>
+      {title ? (
+        <SidebarGroupLabel className='text-muted-foreground px-2 text-xs font-medium tracking-normal'>
+          {title}
+        </SidebarGroupLabel>
+      ) : null}
       <SidebarMenu>
         {items.map((item) => {
           const key = `${item.title}-${item.url || item.type}`
@@ -122,12 +124,27 @@ function NavBadge({ children }: { children: ReactNode }) {
  */
 function SidebarMenuLink({ item, href }: { item: NavLink; href: string }) {
   const { setOpenMobile } = useSidebar()
+  const isExternal =
+    item.external === true ||
+    (typeof item.url === 'string' && /^https?:\/\//.test(item.url))
+
   return (
     <SidebarMenuItem>
       <SidebarMenuButton
-        isActive={checkIsActive(href, item)}
+        isActive={!isExternal && checkIsActive(href, item)}
         tooltip={item.title}
-        render={<Link to={item.url} onClick={() => setOpenMobile(false)} />}
+        render={
+          isExternal ? (
+            <a
+              href={String(item.url)}
+              target='_blank'
+              rel='noopener noreferrer'
+              onClick={() => setOpenMobile(false)}
+            />
+          ) : (
+            <Link to={item.url} onClick={() => setOpenMobile(false)} />
+          )
+        }
       >
         {item.icon && <item.icon className='shrink-0' />}
         <span className='min-w-0 flex-1 truncate'>{item.title}</span>

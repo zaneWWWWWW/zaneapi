@@ -24,10 +24,25 @@ import {
   CONTENT_SECTION_IDS,
 } from '@/features/system-settings/content/section-registry.tsx'
 
+const MOVED_SITE_SECTIONS = {
+  announcements: 'announcements',
+  faq: 'faq',
+  'api-info': 'api-info',
+} as const
+
 export const Route = createFileRoute(
   '/_authenticated/system-settings/content/$section'
 )({
   beforeLoad: ({ params }) => {
+    const movedSection =
+      MOVED_SITE_SECTIONS[params.section as keyof typeof MOVED_SITE_SECTIONS]
+    if (movedSection) {
+      throw redirect({
+        to: '/system-settings/site/$section',
+        params: { section: movedSection },
+      })
+    }
+
     const validSections = CONTENT_SECTION_IDS as unknown as string[]
     if (!validSections.includes(params.section)) {
       throw redirect({

@@ -31,7 +31,7 @@ export function SystemInfo() {
     <SectionPageLayout>
       <SectionPageLayout.Title>
         <span className='inline-flex min-w-0 items-center gap-2'>
-          <span className='truncate'>{t('System Info')}</span>
+          <span className='truncate'>{t('Runtime')}</span>
           <Badge variant='outline' className='shrink-0'>
             Root
           </Badge>

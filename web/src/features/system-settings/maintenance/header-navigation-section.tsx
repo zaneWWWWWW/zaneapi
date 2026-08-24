@@ -49,8 +49,6 @@ import {
 } from './config'
 
 const headerNavSchema = z.object({
-  home: z.boolean(),
-  console: z.boolean(),
   pricingEnabled: z.boolean(),
   pricingRequireAuth: z.boolean(),
   rankingsEnabled: z.boolean(),
@@ -67,12 +65,6 @@ type HeaderNavigationSectionProps = {
 }
 
 const toFormValues = (config: HeaderNavModulesConfig): HeaderNavFormValues => ({
-  home:
-    config.home === undefined ? HEADER_NAV_DEFAULT.home : Boolean(config.home),
-  console:
-    config.console === undefined
-      ? HEADER_NAV_DEFAULT.console
-      : Boolean(config.console),
   pricingEnabled:
     config.pricing?.enabled === undefined
       ? HEADER_NAV_DEFAULT.pricing.enabled
@@ -117,8 +109,8 @@ export function HeaderNavigationSection({
   const onSubmit = async (values: HeaderNavFormValues) => {
     const payload: HeaderNavModulesConfig = {
       ...config,
-      home: values.home,
-      console: values.console,
+      home: config.home ?? HEADER_NAV_DEFAULT.home,
+      console: config.console ?? HEADER_NAV_DEFAULT.console,
       docs: values.docs,
       about: values.about,
       pricing: {
@@ -148,30 +140,20 @@ export function HeaderNavigationSection({
     form.reset(toFormValues(HEADER_NAV_DEFAULT))
   }
 
-  const simpleModules: Array<{
+  const accountMenuModules: Array<{
     key: keyof HeaderNavFormValues
     title: string
     description: string
   }> = [
     {
-      key: 'home',
-      title: t('Home'),
-      description: t('Landing page with system overview.'),
-    },
-    {
-      key: 'console',
-      title: t('Console'),
-      description: t('User dashboard and quota controls.'),
-    },
-    {
       key: 'docs',
       title: t('Docs'),
-      description: t('Documentation or external knowledge base.'),
+      description: t('Show documentation in the account menu.'),
     },
     {
       key: 'about',
       title: t('About'),
-      description: t('Static page describing the platform.'),
+      description: t('Show the About page in the account menu.'),
     },
   ]
 
@@ -189,7 +171,9 @@ export function HeaderNavigationSection({
       requireAuthKey: 'pricingRequireAuth',
       requireAuthDependsOn: 'pricingEnabled',
       title: t('Model Square'),
-      description: t('Public model catalog and pricing page.'),
+      description: t(
+        'Show Model Square in the workspace sidebar. Guests can open it unless login is required.'
+      ),
       requireAuthTitle: t('Require login to view models'),
       requireAuthDescription: t(
         'Visitors must authenticate before accessing the pricing directory.'
@@ -200,7 +184,9 @@ export function HeaderNavigationSection({
       requireAuthKey: 'rankingsRequireAuth',
       requireAuthDependsOn: 'rankingsEnabled',
       title: t('Rankings'),
-      description: t('Public rankings page based on live usage data.'),
+      description: t(
+        'Show Rankings in the workspace sidebar. Guests can open it unless login is required.'
+      ),
       requireAuthTitle: t('Require login to view rankings'),
       requireAuthDescription: t(
         'Visitors must authenticate before accessing the rankings page.'
@@ -209,7 +195,7 @@ export function HeaderNavigationSection({
   ]
 
   return (
-    <SettingsSection title={t('Header navigation')}>
+    <SettingsSection title={t('Explore pages')}>
       <Form {...form}>
         <SettingsForm onSubmit={form.handleSubmit(onSubmit)}>
           <SettingsPageFormActions
@@ -219,31 +205,6 @@ export function HeaderNavigationSection({
             resetLabel='Reset to default'
             saveLabel='Save navigation'
           />
-          <div className='grid gap-4 md:grid-cols-2'>
-            {simpleModules.map((module) => (
-              <FormField
-                key={module.key}
-                control={form.control}
-                name={module.key}
-                render={({ field }) => (
-                  <SettingsSwitchItem>
-                    <SettingsSwitchContent>
-                      <FormLabel>{module.title}</FormLabel>
-                      <FormDescription>{module.description}</FormDescription>
-                    </SettingsSwitchContent>
-                    <FormControl>
-                      <Switch
-                        checked={field.value}
-                        onCheckedChange={field.onChange}
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </SettingsSwitchItem>
-                )}
-              />
-            ))}
-          </div>
-
           <div className='grid gap-4 lg:grid-cols-2'>
             {accessModules.map((module) => (
               <SettingsControlGroup key={module.enabledKey}>
@@ -292,6 +253,31 @@ export function HeaderNavigationSection({
                   )}
                 />
               </SettingsControlGroup>
+            ))}
+          </div>
+
+          <div className='grid gap-4 md:grid-cols-2'>
+            {accountMenuModules.map((module) => (
+              <FormField
+                key={module.key}
+                control={form.control}
+                name={module.key}
+                render={({ field }) => (
+                  <SettingsSwitchItem>
+                    <SettingsSwitchContent>
+                      <FormLabel>{module.title}</FormLabel>
+                      <FormDescription>{module.description}</FormDescription>
+                    </SettingsSwitchContent>
+                    <FormControl>
+                      <Switch
+                        checked={field.value}
+                        onCheckedChange={field.onChange}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </SettingsSwitchItem>
+                )}
+              />
             ))}
           </div>
         </SettingsForm>

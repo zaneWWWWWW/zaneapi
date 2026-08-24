@@ -224,7 +224,7 @@ export function SidebarModulesCard() {
           return (
             <div
               key={section.key}
-              className='bg-background/60 rounded-xl border p-3'
+              className='bg-background/60 rounded-lg border p-3'
             >
               <div className='flex items-start justify-between gap-3'>
                 <div className='min-w-0'>

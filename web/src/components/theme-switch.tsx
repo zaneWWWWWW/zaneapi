@@ -37,7 +37,7 @@ export function ThemeSwitch() {
   /* Update theme-color meta tag
    * when theme is updated */
   useEffect(() => {
-    const themeColor = theme === 'dark' ? '#020817' : '#fff'
+    const themeColor = theme === 'dark' ? '#212121' : '#ffffff'
     const metaThemeColor = document.querySelector("meta[name='theme-color']")
     if (metaThemeColor) metaThemeColor.setAttribute('content', themeColor)
   }, [theme])
@@ -64,13 +64,6 @@ export function ThemeSwitch() {
           <Check
             size={14}
             className={cn('ms-auto', theme !== 'dark' && 'hidden')}
-          />
-        </DropdownMenuItem>
-        <DropdownMenuItem onClick={() => setTheme('system')}>
-          {t('System')}
-          <Check
-            size={14}
-            className={cn('ms-auto', theme !== 'system' && 'hidden')}
           />
         </DropdownMenuItem>
       </DropdownMenuContent>

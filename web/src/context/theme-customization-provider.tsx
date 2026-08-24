@@ -30,10 +30,7 @@ import {
   CONTENT_LAYOUT_VALUES,
   type ContentLayout,
   DEFAULT_THEME_CUSTOMIZATION,
-  resolveThemeFont,
   THEME_COOKIE_KEYS,
-  THEME_FONT_VALUES,
-  THEME_PRESET_VALUES,
   THEME_RADIUS_VALUES,
   THEME_SCALE_VALUES,
   type ThemeCustomization,
@@ -97,20 +94,10 @@ const ThemeCustomizationContext =
 export function ThemeCustomizationProvider(props: {
   children: React.ReactNode
 }) {
-  const [preset, _setPreset] = useState<ThemePreset>(() =>
-    readCookie<ThemePreset>(
-      THEME_COOKIE_KEYS.preset,
-      THEME_PRESET_VALUES,
-      DEFAULT_THEME_CUSTOMIZATION.preset
-    )
+  const [preset, _setPreset] = useState<ThemePreset>(
+    DEFAULT_THEME_CUSTOMIZATION.preset
   )
-  const [font, _setFont] = useState<ThemeFont>(() =>
-    readCookie<ThemeFont>(
-      THEME_COOKIE_KEYS.font,
-      THEME_FONT_VALUES,
-      DEFAULT_THEME_CUSTOMIZATION.font
-    )
-  )
+  const [font, _setFont] = useState<ThemeFont>(DEFAULT_THEME_CUSTOMIZATION.font)
   const [radius, _setRadius] = useState<ThemeRadius>(() =>
     readCookie<ThemeRadius>(
       THEME_COOKIE_KEYS.radius,
@@ -133,23 +120,18 @@ export function ThemeCustomizationProvider(props: {
     )
   )
 
-  // Mirror state to the <body> via data-* attributes so theme-presets.css can
-  // override CSS variables at the right cascade layer.
   useEffect(() => {
-    applyAttribute(
-      'data-theme-preset',
-      preset === DEFAULT_THEME_CUSTOMIZATION.preset ? null : preset
-    )
+    removeCookie(THEME_COOKIE_KEYS.preset)
+    removeCookie(THEME_COOKIE_KEYS.font)
+  }, [])
+
+  // Color presets are locked to the default black/white workspace.
+  useEffect(() => {
+    applyAttribute('data-theme-preset', null)
   }, [preset])
 
-  // Font is the one axis where we resolve before writing the attribute:
-  // the persisted preference may be `default`, but CSS works in terms of
-  // the concrete `sans`/`serif` choice that should drive the cascade.
-  // Resolving here (instead of in CSS via `:not()` selectors) keeps the
-  // stylesheet to one simple `[data-theme-font='serif']` selector and lets
-  // future presets opt into typography via `PRESET_DEFAULT_FONT` alone.
   useEffect(() => {
-    applyAttribute('data-theme-font', resolveThemeFont(font, preset))
+    applyAttribute('data-theme-font', 'sans')
   }, [font, preset])
 
   useEffect(() => {

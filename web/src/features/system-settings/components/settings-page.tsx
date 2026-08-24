@@ -21,6 +21,7 @@ import { useMemo, useState, type ReactNode } from 'react'
 import { useTranslation } from 'react-i18next'
 
 import { SectionPageLayout } from '@/components/layout'
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 
 import { useSystemOptions, getOptionValue } from '../hooks/use-system-options'
 import type { SystemOption } from '../types'
@@ -44,6 +45,9 @@ type SettingsPageProps<
   }
   extraArgs?: TExtraArgs
   loadingMessage?: string
+  pageTitleKey?: string
+  sectionTabs?: readonly { id: TSectionId; titleKey: string }[]
+  onSectionChange?: (section: TSectionId) => void
   resolveSettings?: (
     settings: TSettings,
     raw: SystemOption[] | undefined
@@ -108,6 +112,9 @@ export function SettingsPage<
   getSectionMeta,
   extraArgs,
   loadingMessage = 'Loading settings...',
+  pageTitleKey,
+  sectionTabs,
+  onSectionChange,
   resolveSettings,
 }: SettingsPageProps<TSettings, TSectionId, TExtraArgs>) {
   const { t } = useTranslation()
@@ -116,6 +123,11 @@ export function SettingsPage<
   const params = useParams({ from: routePath as any })
   const activeSection = (params?.section ?? defaultSection) as TSectionId
   const sectionMeta = getSectionMeta(activeSection)
+  const pageTitle = t(pageTitleKey ?? sectionMeta.titleKey)
+  const showSectionTabs =
+    Boolean(sectionTabs) &&
+    Boolean(onSectionChange) &&
+    (sectionTabs?.length ?? 0) > 1
 
   const settings = useMemo(() => {
     const baseSettings = getOptionValue(
@@ -127,9 +139,25 @@ export function SettingsPage<
       : baseSettings
   }, [data?.data, defaultSettings, resolveSettings])
 
+  const tabs = showSectionTabs ? (
+    <Tabs
+      value={activeSection}
+      onValueChange={(section) => onSectionChange?.(section as TSectionId)}
+    >
+      <TabsList className='max-w-full flex-wrap justify-start group-data-horizontal/tabs:h-auto'>
+        {sectionTabs?.map((tab) => (
+          <TabsTrigger key={tab.id} value={tab.id}>
+            {t(tab.titleKey)}
+          </TabsTrigger>
+        ))}
+      </TabsList>
+    </Tabs>
+  ) : null
+
   if (isLoading) {
     return (
-      <SettingsPageFrame title={t(sectionMeta.titleKey)}>
+      <SettingsPageFrame title={pageTitle}>
+        {tabs}
         <div className='text-muted-foreground flex min-h-40 items-center justify-center text-sm'>
           {t(loadingMessage)}
         </div>
@@ -144,7 +172,8 @@ export function SettingsPage<
   )
 
   return (
-    <SettingsPageFrame title={t(sectionMeta.titleKey)}>
+    <SettingsPageFrame title={pageTitle}>
+      {tabs}
       {sectionContent}
     </SettingsPageFrame>
   )

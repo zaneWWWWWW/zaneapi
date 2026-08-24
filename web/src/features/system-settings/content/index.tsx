@@ -16,22 +16,20 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 For commercial licensing, please contact support@quantumnous.com
 */
+import { useNavigate } from '@tanstack/react-router'
+
 import { SettingsPage } from '../components/settings-page'
 import type { ContentSettings, SystemOption } from '../types'
 import {
   CONTENT_DEFAULT_SECTION,
+  CONTENT_SECTION_IDS,
   getContentSectionContent,
   getContentSectionMeta,
+  type ContentSectionId,
 } from './section-registry.tsx'
 
 const defaultContentSettings: ContentSettings = {
-  'console_setting.api_info': '[]',
-  'console_setting.announcements': '[]',
-  'console_setting.faq': '[]',
   'console_setting.uptime_kuma_groups': '[]',
-  'console_setting.api_info_enabled': true,
-  'console_setting.announcements_enabled': true,
-  'console_setting.faq_enabled': true,
   'console_setting.uptime_kuma_enabled': false,
   DataExportEnabled: false,
   DataExportDefaultTime: 'hour',
@@ -54,21 +52,6 @@ function resolveContentSettings(
   const optionMap = new Map(raw.map((item) => [item.key, item.value]))
   const next = { ...settings }
 
-  const legacyMap = [
-    { current: 'console_setting.announcements', legacy: 'Announcements' },
-    { current: 'console_setting.api_info', legacy: 'ApiInfo' },
-    { current: 'console_setting.faq', legacy: 'FAQ' },
-  ] as const
-
-  for (const { current, legacy } of legacyMap) {
-    if (!optionMap.has(current)) {
-      const legacyValue = optionMap.get(legacy)
-      if (legacyValue !== undefined) {
-        next[current] = legacyValue
-      }
-    }
-  }
-
   if (!optionMap.has('console_setting.uptime_kuma_groups')) {
     const legacyUrl = optionMap.get('UptimeKumaUrl')
     const legacySlug = optionMap.get('UptimeKumaSlug')
@@ -83,6 +66,7 @@ function resolveContentSettings(
 }
 
 export function ContentSettings() {
+  const navigate = useNavigate()
   return (
     <SettingsPage
       routePath='/_authenticated/system-settings/content/$section'
@@ -92,6 +76,17 @@ export function ContentSettings() {
       getSectionMeta={getContentSectionMeta}
       loadingMessage='Loading content settings...'
       resolveSettings={resolveContentSettings}
+      pageTitleKey='Console display'
+      sectionTabs={CONTENT_SECTION_IDS.map((id) => ({
+        id,
+        titleKey: getContentSectionMeta(id).titleKey,
+      }))}
+      onSectionChange={(section: ContentSectionId) => {
+        void navigate({
+          to: '/system-settings/content/$section',
+          params: { section },
+        })
+      }}
     />
   )
 }
