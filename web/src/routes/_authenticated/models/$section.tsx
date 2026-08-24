@@ -20,6 +20,7 @@ import { createFileRoute, redirect } from '@tanstack/react-router'
 import z from 'zod'
 
 import { Models } from '@/features/models'
+import { MODEL_WORKSPACE_VIEW_IDS } from '@/features/models/constants'
 import {
   MODELS_SECTION_IDS,
   MODELS_DEFAULT_SECTION,
@@ -34,6 +35,7 @@ const modelsSearchSchema = z.object({
   vendor: z.array(z.string()).optional().catch([]),
   status: z.array(z.string()).optional().catch([]),
   sync: z.array(z.string()).optional().catch([]),
+  view: z.enum(MODEL_WORKSPACE_VIEW_IDS).optional().catch(undefined),
   dPage: z.number().optional().catch(1),
   dPageSize: z.number().optional().catch(10),
   dFilter: z.string().optional().catch(''),
@@ -47,6 +49,14 @@ export const Route = createFileRoute('/_authenticated/models/$section')({
     if (!auth.user || auth.user.role < ROLE.ADMIN) {
       throw redirect({
         to: '/403',
+      })
+    }
+
+    if (params.section === 'pricing') {
+      throw redirect({
+        to: '/models/$section',
+        params: { section: 'metadata' },
+        search: { view: 'prices' },
       })
     }
 

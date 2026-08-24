@@ -16,7 +16,6 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 For commercial licensing, please contact support@quantumnous.com
 */
-import { useNavigate } from '@tanstack/react-router'
 import {
   AlertCircle,
   CheckCircle2,
@@ -60,6 +59,7 @@ interface DeploymentAccessGuardProps {
   connectionOk: boolean | null
   connectionError: string | null
   onRetry: () => void
+  onOpenSettings: () => void
 }
 
 function LoadingStep({
@@ -101,16 +101,9 @@ export function DeploymentAccessGuard({
   connectionOk,
   connectionError,
   onRetry,
+  onOpenSettings,
 }: DeploymentAccessGuardProps) {
   const { t } = useTranslation()
-  const navigate = useNavigate()
-
-  const handleGoToSettings = () => {
-    navigate({
-      to: '/system-settings/models/$section',
-      params: { section: 'model-deployment' },
-    })
-  }
 
   // Combined loading state with step indicator
   if (loading || connectionLoading) {
@@ -158,7 +151,7 @@ export function DeploymentAccessGuard({
               )}
             </AlertDescription>
           </Alert>
-          <Button onClick={handleGoToSettings} className='w-full'>
+          <Button onClick={onOpenSettings} className='w-full'>
             <Settings className='mr-2 h-4 w-4' />
             {t('Go to settings')}
           </Button>
@@ -189,7 +182,7 @@ export function DeploymentAccessGuard({
             <Button variant='outline' onClick={onRetry} className='flex-1'>
               {t('Retry')}
             </Button>
-            <Button onClick={handleGoToSettings} className='flex-1'>
+            <Button onClick={onOpenSettings} className='flex-1'>
               <Settings className='mr-2 h-4 w-4' />
               {t('Go to settings')}
             </Button>
@@ -199,5 +192,5 @@ export function DeploymentAccessGuard({
     )
   }
 
-  return <>{children}</>
+  return children
 }

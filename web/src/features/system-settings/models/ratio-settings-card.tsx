@@ -136,7 +136,7 @@ const createGroupSchema = (t: Translate) =>
 
 type ModelFormValues = z.infer<ReturnType<typeof createModelSchema>>
 type GroupFormValues = z.infer<ReturnType<typeof createGroupSchema>>
-type RatioTabId =
+export type RatioTabId =
   | 'models'
   | 'unset-models'
   | 'groups'

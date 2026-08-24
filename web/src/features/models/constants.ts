@@ -16,7 +16,7 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 For commercial licensing, please contact support@quantumnous.com
 */
-import { type TFunction } from 'i18next'
+import type { TFunction } from 'i18next'
 
 import type { NameRule, ModelStatus, SyncSource } from './types'
 
@@ -25,6 +25,33 @@ import type { NameRule, ModelStatus, SyncSource } from './types'
 // ============================================================================
 
 export const DEFAULT_PAGE_SIZE = 20
+
+export const MODEL_WORKSPACE_VIEWS = [
+  { id: 'catalog', titleKey: 'Catalog' },
+  { id: 'prices', titleKey: 'Model prices', pricingTab: 'models' },
+  {
+    id: 'unset',
+    titleKey: 'Unset price models',
+    pricingTab: 'unset-models',
+  },
+  { id: 'tools', titleKey: 'Tool prices', pricingTab: 'tool-prices' },
+  {
+    id: 'sync',
+    titleKey: 'Upstream price sync',
+    pricingTab: 'upstream-sync',
+  },
+] as const
+
+export type ModelWorkspaceViewId = (typeof MODEL_WORKSPACE_VIEWS)[number]['id']
+
+export const MODEL_WORKSPACE_DEFAULT_VIEW: ModelWorkspaceViewId = 'catalog'
+export const MODEL_WORKSPACE_VIEW_IDS = [
+  'catalog',
+  'prices',
+  'unset',
+  'tools',
+  'sync',
+] as const satisfies readonly ModelWorkspaceViewId[]
 
 // ============================================================================
 // Name Rule Options
