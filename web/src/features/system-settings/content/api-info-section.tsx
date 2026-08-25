@@ -90,6 +90,23 @@ type ApiInfoFormValues = z.infer<ReturnType<typeof createApiInfoSchema>>
 
 const API_INFO_FORM_ID = 'api-info-form'
 
+const ADDRESS_PRESETS = [
+  {
+    id: 'direct',
+    route: 'Direct',
+    description: 'Direct connection',
+    color: 'blue',
+    urlPlaceholder: 'https://api.example.com',
+  },
+  {
+    id: 'cloudflare',
+    route: 'Cloudflare',
+    description: 'Recommended for users in mainland China',
+    color: 'green',
+    urlPlaceholder: 'https://cf.example.com',
+  },
+] as const
+
 const colorOptions = [
   { value: 'blue', label: 'Blue' },
   { value: 'green', label: 'Green' },
@@ -265,6 +282,11 @@ export function ApiInfoSection({ enabled, data }: ApiInfoSectionProps) {
   return (
     <SettingsSection title={t('API Addresses')}>
       <div className='space-y-4'>
+        <p className='text-muted-foreground text-sm'>
+          {t(
+            'Shown on the API keys page. Add both a direct URL and a Cloudflare URL for users in mainland China.'
+          )}
+        </p>
         <div className='flex flex-wrap items-center justify-between gap-2'>
           <div className='flex flex-wrap items-center gap-2'>
             <Button onClick={handleAdd} size='sm'>
@@ -391,7 +413,9 @@ export function ApiInfoSection({ enabled, data }: ApiInfoSectionProps) {
         open={showDialog}
         onOpenChange={setShowDialog}
         title={editingApiInfo ? t('Edit API Shortcut') : t('Add API Shortcut')}
-        description={t('Configure API documentation links for the dashboard')}
+        description={t(
+          'Configure API base URLs shown on the API keys page'
+        )}
         contentHeight='auto'
         bodyClassName='space-y-4'
         footer={
@@ -415,6 +439,30 @@ export function ApiInfoSection({ enabled, data }: ApiInfoSectionProps) {
             onSubmit={form.handleSubmit(handleSubmitForm)}
             className='space-y-4'
           >
+            {!editingApiInfo && (
+              <div className='flex flex-wrap gap-2'>
+                {ADDRESS_PRESETS.map((preset) => (
+                  <Button
+                    key={preset.id}
+                    type='button'
+                    size='sm'
+                    variant='outline'
+                    onClick={() =>
+                      form.reset({
+                        url: form.getValues('url'),
+                        route: preset.route,
+                        description: preset.description,
+                        color: preset.color,
+                      })
+                    }
+                  >
+                    {preset.id === 'direct'
+                      ? t('Direct URL')
+                      : t('Cloudflare URL')}
+                  </Button>
+                ))}
+              </div>
+            )}
             <FormField
               control={form.control}
               name='url'
