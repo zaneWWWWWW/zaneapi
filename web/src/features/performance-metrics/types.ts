@@ -59,3 +59,22 @@ export type PerfSummaryAllData = {
     models: PerfModelSummary[]
   }
 }
+
+export type GroupAvailability = {
+  group: string
+  description?: string
+  current_success_rate: number | null
+  hours_success_rate: number | null
+  current_request_count: number
+  hours_request_count: number
+}
+
+export type GroupAvailabilityData = {
+  success: boolean
+  message?: string
+  data: {
+    hours: number
+    bucket_seconds: number
+    groups: GroupAvailability[]
+  }
+}

@@ -31,6 +31,7 @@ import {
 const defaultContentSettings: ContentSettings = {
   'console_setting.uptime_kuma_groups': '[]',
   'console_setting.uptime_kuma_enabled': false,
+  'console_setting.group_availability_groups': '[]',
   DataExportEnabled: false,
   DataExportDefaultTime: 'hour',
   DataExportInterval: 5,

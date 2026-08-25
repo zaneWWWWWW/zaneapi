@@ -60,6 +60,21 @@ type SummaryAllResult struct {
 	Models []ModelSummary `json:"models"`
 }
 
+type GroupAvailability struct {
+	Group               string   `json:"group"`
+	Description         string   `json:"description,omitempty"`
+	CurrentSuccessRate  *float64 `json:"current_success_rate"`
+	HoursSuccessRate    *float64 `json:"hours_success_rate"`
+	CurrentRequestCount int64    `json:"current_request_count"`
+	HoursRequestCount   int64    `json:"hours_request_count"`
+}
+
+type GroupAvailabilityResult struct {
+	Hours         int                 `json:"hours"`
+	BucketSeconds int64               `json:"bucket_seconds"`
+	Groups        []GroupAvailability `json:"groups"`
+}
+
 type bucketKey struct {
 	model    string
 	group    string

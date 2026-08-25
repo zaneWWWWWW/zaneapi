@@ -165,22 +165,6 @@ export interface ProcessedFlowData {
 }
 
 // ============================================================================
-// Uptime Monitoring Types
-// ============================================================================
-
-export interface UptimeMonitor {
-  name: string
-  uptime: number
-  status: number
-  group?: string
-}
-
-export interface UptimeGroupResult {
-  categoryName: string
-  monitors: UptimeMonitor[]
-}
-
-// ============================================================================
 // Dashboard Filter Types
 // ============================================================================
 

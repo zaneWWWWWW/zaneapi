@@ -26,6 +26,7 @@ import { StaggerContainer, StaggerItem } from '@/components/page-transition'
 import { Button } from '@/components/ui/button'
 import { getUserQuotaDates } from '@/features/dashboard/api'
 import { useSummaryCardsConfig } from '@/features/dashboard/hooks/use-dashboard-config'
+import { formatQuotaDataFreshnessMessage } from '@/features/dashboard/lib'
 import type { QuotaDataItem } from '@/features/dashboard/types'
 import { useStatus } from '@/hooks/use-status'
 import { getCurrencyLabel, isCurrencyDisplayEnabled } from '@/lib/currency'
@@ -137,9 +138,13 @@ const HEALTH_CONFIG: Record<
 }
 
 export function SummaryCards() {
-  const { t } = useTranslation()
+  const { t, i18n } = useTranslation()
   const user = useAuthStore((state) => state.auth.user)
   const { status, loading } = useStatus()
+  const freshnessLabel = formatQuotaDataFreshnessMessage(t, {
+    language: i18n.resolvedLanguage || i18n.language,
+    status,
+  })
 
   const summaryTimeRange = useMemo(() => computeTimeRange(1), [])
   const remainQuota = Number(user?.quota ?? 0)
@@ -260,6 +265,9 @@ export function SummaryCards() {
               </h3>
               <p className='text-muted-foreground text-xs sm:text-sm'>
                 {t('Monitor balance, usage, and request volume')}
+              </p>
+              <p className='text-muted-foreground/70 text-[11px] sm:text-xs'>
+                {freshnessLabel}
               </p>
             </div>
           </div>

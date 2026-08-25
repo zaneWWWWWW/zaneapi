@@ -180,6 +180,7 @@ export type AuthSettings = {
 export type ContentSettings = {
   'console_setting.uptime_kuma_groups': string
   'console_setting.uptime_kuma_enabled': boolean
+  'console_setting.group_availability_groups': string
   DataExportEnabled: boolean
   DataExportDefaultTime: string
   DataExportInterval: number

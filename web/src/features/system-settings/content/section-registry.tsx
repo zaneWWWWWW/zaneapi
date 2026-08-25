@@ -21,7 +21,7 @@ import { createSectionRegistry } from '../utils/section-registry'
 import { ChatSettingsSection } from './chat-settings-section'
 import { DashboardSection } from './dashboard-section'
 import { DrawingSettingsSection } from './drawing-settings-section'
-import { UptimeKumaSection } from './uptime-kuma-section'
+import { GroupAvailabilitySection } from './group-availability-section'
 
 /**
  * Validate and coerce DataExportDefaultTime to a safe value
@@ -51,12 +51,11 @@ const CONTENT_SECTIONS = [
     ),
   },
   {
-    id: 'uptime-kuma',
-    titleKey: 'Uptime Kuma',
+    id: 'group-availability',
+    titleKey: 'Group availability',
     build: (settings: ContentSettings) => (
-      <UptimeKumaSection
-        enabled={settings['console_setting.uptime_kuma_enabled']}
-        data={settings['console_setting.uptime_kuma_groups']}
+      <GroupAvailabilitySection
+        groupsJson={settings['console_setting.group_availability_groups']}
       />
     ),
   },

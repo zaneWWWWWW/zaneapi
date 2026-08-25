@@ -29,6 +29,7 @@ interface PanelWrapperProps {
   empty?: boolean
   emptyMessage?: string
   height?: string
+  fill?: boolean
   className?: string
   contentClassName?: string
   headerActions?: ReactNode
@@ -66,17 +67,24 @@ function PanelHeader(props: {
 export function PanelWrapper(props: PanelWrapperProps) {
   const { t } = useTranslation()
   const resolvedEmptyMessage = props.emptyMessage ?? t('No data available')
-  const height = props.height ?? 'h-64'
+  const fill = Boolean(props.fill)
+  const height = fill ? 'min-h-80 flex-1' : (props.height ?? 'h-64')
   const frameClassName = cn(
     'bg-card overflow-hidden rounded-lg border shadow-xs',
+    fill && 'flex h-full min-h-80 flex-col',
     props.className
+  )
+  const paddedBodyClassName = cn(
+    'p-4 sm:p-5',
+    fill && 'flex min-h-0 flex-1 flex-col',
+    props.contentClassName
   )
 
   if (props.loading) {
     return (
       <div className={frameClassName}>
         <PanelHeader title={props.title} description={props.description} />
-        <div className={cn('p-4 sm:p-5', props.contentClassName)}>
+        <div className={paddedBodyClassName}>
           <Skeleton className={`w-full ${height}`} />
         </div>
       </div>
@@ -107,7 +115,7 @@ export function PanelWrapper(props: PanelWrapperProps) {
         description={props.description}
         actions={props.headerActions}
       />
-      <div className={cn('p-4 sm:p-5', props.contentClassName)}>
+      <div className={paddedBodyClassName}>
         {props.children}
       </div>
     </div>

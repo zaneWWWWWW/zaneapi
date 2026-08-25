@@ -122,6 +122,51 @@ func Query(params QueryParams) (QueryResult, error) {
 	return buildQueryResult(params.Model, merged), nil
 }
 
+func QueryGroupAvailability(hours int, groups []string) (GroupAvailabilityResult, error) {
+	if hours <= 0 {
+		hours = 24
+	}
+	if hours > 24*30 {
+		hours = 24 * 30
+	}
+	bucketSeconds := perf_metrics_setting.GetBucketSeconds()
+	if bucketSeconds <= 0 {
+		bucketSeconds = 3600
+	}
+	endTs := time.Now().Unix()
+	startTs := endTs - int64(hours)*3600
+	currentBucketTs := bucketStart(endTs)
+	allowedGroups := allowedGroupSet(groups)
+
+	merged := map[string]map[int64]counters{}
+	rows, err := model.GetPerfMetricsGroupBuckets(startTs, endTs, groups)
+	if err != nil {
+		return GroupAvailabilityResult{}, err
+	}
+	for _, row := range rows {
+		mergeGroupBucket(merged, row.GroupName, row.BucketTs, counters{
+			requestCount: row.RequestCount,
+			successCount: row.SuccessCount,
+		})
+	}
+
+	hotBuckets.Range(func(key, value any) bool {
+		k := key.(bucketKey)
+		if k.bucketTs < startTs || k.bucketTs > endTs {
+			return true
+		}
+		if allowedGroups != nil {
+			if _, ok := allowedGroups[k.group]; !ok {
+				return true
+			}
+		}
+		mergeGroupBucket(merged, k.group, k.bucketTs, value.(*atomicBucket).snapshot())
+		return true
+	})
+
+	return buildGroupAvailability(groups, currentBucketTs, hours, bucketSeconds, merged), nil
+}
+
 func QuerySummaryAll(hours int, groups []string) (SummaryAllResult, error) {
 	if hours <= 0 {
 		hours = 24
@@ -250,6 +295,76 @@ func recentSuccessRates(buckets map[int64]counters, limit int) []float64 {
 		rates = append(rates, math.Round(successRate(buckets[ts])*100)/100)
 	}
 	return rates
+}
+
+func mergeGroupBucket(
+	merged map[string]map[int64]counters,
+	group string,
+	bucketTs int64,
+	value counters,
+) {
+	if value.requestCount == 0 || group == "" {
+		return
+	}
+	if merged[group] == nil {
+		merged[group] = map[int64]counters{}
+	}
+	current := merged[group][bucketTs]
+	current.requestCount += value.requestCount
+	current.successCount += value.successCount
+	current.totalLatencyMs += value.totalLatencyMs
+	current.ttftSumMs += value.ttftSumMs
+	current.ttftCount += value.ttftCount
+	current.outputTokens += value.outputTokens
+	current.generationMs += value.generationMs
+	merged[group][bucketTs] = current
+}
+
+func roundedSuccessRatePtr(value counters) *float64 {
+	if value.requestCount <= 0 {
+		return nil
+	}
+	rate := math.Round(successRate(value)*100) / 100
+	return &rate
+}
+
+func buildGroupAvailability(
+	groups []string,
+	currentBucketTs int64,
+	hours int,
+	bucketSeconds int64,
+	merged map[string]map[int64]counters,
+) GroupAvailabilityResult {
+	results := make([]GroupAvailability, 0, len(groups))
+	for _, group := range groups {
+		hoursTotal := counters{}
+		current := counters{}
+		for ts, value := range merged[group] {
+			hoursTotal.requestCount += value.requestCount
+			hoursTotal.successCount += value.successCount
+			if ts == currentBucketTs {
+				current = value
+			}
+		}
+		results = append(results, GroupAvailability{
+			Group:               group,
+			CurrentSuccessRate:  roundedSuccessRatePtr(current),
+			HoursSuccessRate:    roundedSuccessRatePtr(hoursTotal),
+			CurrentRequestCount: current.requestCount,
+			HoursRequestCount:   hoursTotal.requestCount,
+		})
+	}
+	sort.SliceStable(results, func(i, j int) bool {
+		if results[i].HoursRequestCount != results[j].HoursRequestCount {
+			return results[i].HoursRequestCount > results[j].HoursRequestCount
+		}
+		return results[i].Group < results[j].Group
+	})
+	return GroupAvailabilityResult{
+		Hours:         hours,
+		BucketSeconds: bucketSeconds,
+		Groups:        results,
+	}
 }
 
 func allowedGroupSet(groups []string) map[string]struct{} {

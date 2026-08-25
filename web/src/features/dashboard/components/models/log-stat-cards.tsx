@@ -26,12 +26,14 @@ import { useModelStatCardsConfig } from '@/features/dashboard/hooks/use-dashboar
 import {
   buildQueryParams,
   calculateDashboardStats,
+  formatQuotaDataFreshnessMessage,
   getDefaultDays,
 } from '@/features/dashboard/lib'
 import type {
   QuotaDataItem,
   DashboardFilters,
 } from '@/features/dashboard/types'
+import { useStatus } from '@/hooks/use-status'
 import { toIntlLocale } from '@/i18n/languages'
 import { formatCompactNumber, formatNumber, formatQuota } from '@/lib/format'
 import { computeTimeRange } from '@/lib/time'
@@ -59,9 +61,14 @@ function formatStatNumber(value: number, locale: Intl.LocalesArgument) {
 }
 
 export function LogStatCards(props: LogStatCardsProps) {
-  const { i18n } = useTranslation()
+  const { t, i18n } = useTranslation()
+  const { status } = useStatus()
   const statCardsConfig = useModelStatCardsConfig()
   const user = useAuthStore((state) => state.auth.user)
+  const freshnessLabel = formatQuotaDataFreshnessMessage(t, {
+    language: i18n.resolvedLanguage || i18n.language,
+    status,
+  })
   const isAdmin = !!(user?.role && user.role >= 10)
   const [stats, setStats] = useState<{
     totalQuota: number
@@ -209,6 +216,9 @@ export function LogStatCards(props: LogStatCardsProps) {
             </div>
           )
         })}
+      </div>
+      <div className='text-muted-foreground/70 border-t px-2.5 py-1.5 text-[11px] sm:px-5 sm:text-xs'>
+        {freshnessLabel}
       </div>
     </div>
   )

@@ -96,6 +96,32 @@ func GetPerfMetricsSummaryAll(startTs int64, endTs int64, groups []string) ([]Pe
 	return summaries, err
 }
 
+type PerfMetricGroupBucket struct {
+	GroupName    string `json:"group_name" gorm:"column:group_name"`
+	BucketTs     int64  `json:"bucket_ts"`
+	RequestCount int64  `json:"request_count"`
+	SuccessCount int64  `json:"success_count"`
+}
+
+func GetPerfMetricsGroupBuckets(startTs int64, endTs int64, groups []string) ([]PerfMetricGroupBucket, error) {
+	var summaries []PerfMetricGroupBucket
+	if groups != nil && len(groups) == 0 {
+		return summaries, nil
+	}
+	query := DB.Model(&PerfMetric{}).
+		Select(commonGroupCol+" as group_name, bucket_ts, SUM(request_count) as request_count, SUM(success_count) as success_count").
+		Where("bucket_ts >= ? AND bucket_ts <= ?", startTs, endTs)
+	if groups != nil {
+		query = query.Where(commonGroupCol+" IN ?", groups)
+	}
+	err := query.
+		Group(commonGroupCol + ", bucket_ts").
+		Having("SUM(request_count) > 0").
+		Order("bucket_ts ASC").
+		Find(&summaries).Error
+	return summaries, err
+}
+
 func GetPerfMetricsSummaryBucketsAll(startTs int64, endTs int64, groups []string) ([]PerfMetricSummaryBucket, error) {
 	var summaries []PerfMetricSummaryBucket
 	query := DB.Model(&PerfMetric{}).

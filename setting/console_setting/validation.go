@@ -8,6 +8,8 @@ import (
 	"sort"
 	"strings"
 	"time"
+
+	"github.com/QuantumNous/new-api/common"
 )
 
 var (
@@ -73,6 +75,8 @@ func ValidateConsoleSettings(settingsStr string, settingType string) error {
 		return validateFAQ(settingsStr)
 	case "UptimeKumaGroups":
 		return validateUptimeKumaGroups(settingsStr)
+	case "GroupAvailabilityGroups":
+		return validateGroupAvailabilityGroups(settingsStr)
 	default:
 		return fmt.Errorf("未知的设置类型：%s", settingType)
 	}
@@ -301,4 +305,59 @@ func validateUptimeKumaGroups(groupsStr string) error {
 
 func GetUptimeKumaGroups() []map[string]interface{} {
 	return getJSONList(GetConsoleSetting().UptimeKumaGroups)
+}
+
+func validateGroupAvailabilityGroups(groupsStr string) error {
+	var groups []string
+	if err := common.UnmarshalJsonStr(groupsStr, &groups); err != nil {
+		return fmt.Errorf("分组可用性列表格式错误：%s", err.Error())
+	}
+	if len(groups) > 50 {
+		return fmt.Errorf("分组可用性列表不能超过50个")
+	}
+	seen := make(map[string]bool, len(groups))
+	for i, name := range groups {
+		if name == "" {
+			return fmt.Errorf("第%d个分组名称为空", i+1)
+		}
+		if len(name) > 64 {
+			return fmt.Errorf("第%d个分组名称长度不能超过64字符", i+1)
+		}
+		if !slugRegex.MatchString(name) {
+			return fmt.Errorf("第%d个分组名称只能包含字母、数字、下划线和连字符", i+1)
+		}
+		if seen[name] {
+			return fmt.Errorf("第%d个分组名称与其他分组重复", i+1)
+		}
+		seen[name] = true
+		if err := checkDangerousContent(name, i+1, "分组"); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func GetGroupAvailabilityGroups() []string {
+	raw := GetConsoleSetting().GroupAvailabilityGroups
+	if strings.TrimSpace(raw) == "" {
+		return []string{}
+	}
+	var groups []string
+	if err := common.UnmarshalJsonStr(raw, &groups); err != nil {
+		return []string{}
+	}
+	out := make([]string, 0, len(groups))
+	seen := make(map[string]struct{}, len(groups))
+	for _, name := range groups {
+		name = strings.TrimSpace(name)
+		if name == "" {
+			continue
+		}
+		if _, ok := seen[name]; ok {
+			continue
+		}
+		seen[name] = struct{}{}
+		out = append(out, name)
+	}
+	return out
 }

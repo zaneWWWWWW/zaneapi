@@ -37,6 +37,7 @@ const STATUS_RELATED_KEYS = [
   'general_setting.custom_currency_symbol',
   'general_setting.custom_currency_exchange_rate',
   'HomePageDisplayedGroups',
+  'console_setting.group_availability_groups',
   'About',
   'Docs',
 ]
