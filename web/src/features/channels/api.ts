@@ -38,6 +38,7 @@ import type {
   SearchChannelsParams,
   SearchChannelsResponse,
   TagOperationParams,
+  UptimeGroupResult,
 } from './types'
 
 const channelActionConfig = (
@@ -628,6 +629,13 @@ export async function getOllamaVersion(
  * Get all available groups (re-exported from users API for convenience)
  */
 export const getGroups = getUserGroups
+
+export async function getUptimeStatus() {
+  const res = await api.get<{ success: boolean; data: UptimeGroupResult[] }>(
+    '/api/uptime/status'
+  )
+  return res.data
+}
 
 // ============================================================================
 // Prefill Groups (Model Groups)

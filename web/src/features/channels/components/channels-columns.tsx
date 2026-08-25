@@ -75,7 +75,9 @@ import {
   type TagRow,
 } from '../lib'
 import { parseUpstreamUpdateMeta } from '../lib/upstream-update-utils'
-import type { Channel } from '../types'
+import { matchChannelProbe } from '../lib/uptime-match'
+import type { Channel, UptimeMonitor } from '../types'
+import { ChannelProbeCell } from './channel-probe-cell'
 import { ChannelRowActionsLayoutContext } from './channel-row-actions-context'
 import { useChannels } from './channels-provider'
 import { DataTableRowActions } from './data-table-row-actions'
@@ -515,11 +517,15 @@ function BalanceCell({ channel }: { channel: Channel }) {
 export function useChannelsColumns(
   options: {
     enableSelection?: boolean
+    showProbe?: boolean
+    probeLookup?: Map<string, UptimeMonitor>
   } = {}
 ): ColumnDef<Channel>[] {
   const { t, i18n } = useTranslation()
   const { sensitiveVisible } = useChannels()
   const enableSelection = options.enableSelection ?? true
+  const showProbe = options.showProbe ?? false
+  const probeLookup = options.probeLookup
   const locale = toIntlLocale(i18n.resolvedLanguage || i18n.language)
   // The column definitions only depend on the translation function, the active
   // locale, and sensitive-data visibility. Memoizing keeps the array (and every
@@ -955,6 +961,30 @@ export function useChannelsColumns(
         enableSorting: false,
       },
 
+      ...(showProbe
+        ? [
+            {
+              id: 'probe',
+              header: t('Probe'),
+              meta: { mobileHidden: true },
+              cell: ({ row }) => {
+                if (isTagAggregateRow(row.original) || !probeLookup) {
+                  return (
+                    <span className='text-muted-foreground text-xs'>—</span>
+                  )
+                }
+                return (
+                  <ChannelProbeCell
+                    monitor={matchChannelProbe(row.original.name, probeLookup)}
+                  />
+                )
+              },
+              enableSorting: false,
+              size: 96,
+            } satisfies ColumnDef<Channel>,
+          ]
+        : []),
+
       // Models column
       {
         accessorKey: 'models',
@@ -1153,6 +1183,6 @@ export function useChannelsColumns(
         meta: { pinned: 'right' as const },
       },
     ],
-    [enableSelection, t, locale, sensitiveVisible]
+    [enableSelection, locale, probeLookup, sensitiveVisible, showProbe, t]
   )
 }

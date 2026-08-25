@@ -43,10 +43,11 @@ import {
   TooltipTrigger,
 } from '@/components/ui/tooltip'
 import { useMediaQuery } from '@/hooks'
+import { useStatus } from '@/hooks/use-status'
 import { useTableUrlState } from '@/hooks/use-table-url-state'
 import { getLobeIcon } from '@/lib/lobe-icon'
 
-import { getChannels, searchChannels, getGroups } from '../api'
+import { getChannels, searchChannels, getGroups, getUptimeStatus } from '../api'
 import {
   DEFAULT_PAGE_SIZE,
   CHANNEL_STATUS,
@@ -58,12 +59,14 @@ import {
   isTagAggregateRow,
   getChannelTypeIcon,
   getChannelTypeLabel,
+  buildProbeLookup,
 } from '../lib'
 import type { Channel, ChannelSortBy } from '../types'
 import { ChannelCard } from './channel-card'
 import { useChannelsColumns } from './channels-columns'
 import { useChannels } from './channels-provider'
 import { DataTableBulkActions } from './data-table-bulk-actions'
+import { UptimeKumaToolbar } from './uptime-kuma-toolbar'
 
 const route = getRouteApi('/_authenticated/channels/')
 const CHANNELS_COLUMN_VISIBILITY_STORAGE_KEY = 'channels:column-visibility'
@@ -95,6 +98,9 @@ export function ChannelsTable() {
     sensitiveVisible,
     setSensitiveVisible,
   } = useChannels()
+  const { status } = useStatus()
+  const probeEnabled =
+    Boolean(status) && status?.uptime_kuma_enabled !== false
   const isMobile = useMediaQuery('(max-width: 640px)')
 
   // Table state
@@ -304,7 +310,22 @@ export function ChannelsTable() {
   const typeCounts = data?.data?.type_counts
 
   // Columns configuration
-  const columns = useChannelsColumns({ enableSelection: batchMode })
+  const uptimeQuery = useQuery({
+    queryKey: ['uptime-kuma-status'],
+    queryFn: getUptimeStatus,
+    enabled: probeEnabled,
+    staleTime: 60 * 1000,
+    retry: false,
+  })
+  const probeLookup = useMemo(
+    () => buildProbeLookup(uptimeQuery.data?.data),
+    [uptimeQuery.data?.data]
+  )
+  const columns = useChannelsColumns({
+    enableSelection: batchMode,
+    showProbe: probeEnabled,
+    probeLookup,
+  })
 
   // React Table instance
   const { table } = useDataTable({
@@ -460,6 +481,10 @@ export function ChannelsTable() {
           },
         ],
         preActions: (
+          <>
+            <UptimeKumaToolbar
+              channelNames={channels.map((channel) => channel.name)}
+            />
           <Tooltip>
             <TooltipTrigger
               render={
@@ -478,6 +503,7 @@ export function ChannelsTable() {
               {sensitiveVisible ? t('Hide') : t('Show')}
             </TooltipContent>
           </Tooltip>
+          </>
         ),
       }}
       getRowClassName={(row, { isMobile }) => {

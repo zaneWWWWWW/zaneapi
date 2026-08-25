@@ -38,6 +38,8 @@ const STATUS_RELATED_KEYS = [
   'general_setting.custom_currency_exchange_rate',
   'HomePageDisplayedGroups',
   'console_setting.group_availability_groups',
+  'console_setting.uptime_kuma_enabled',
+  'console_setting.uptime_kuma_groups',
   'About',
   'Docs',
 ]

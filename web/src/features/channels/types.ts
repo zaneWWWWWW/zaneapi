@@ -375,3 +375,15 @@ export interface AddChannelRequest {
   batch_add_set_key_prefix_2_name?: boolean
   channel: Partial<Channel>
 }
+
+export interface UptimeMonitor {
+  name: string
+  uptime: number
+  status: number
+  group?: string
+}
+
+export interface UptimeGroupResult {
+  categoryName: string
+  monitors: UptimeMonitor[]
+}

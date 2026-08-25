@@ -71,6 +71,7 @@ function ChannelCardComponent({
   const typeCell = renderCell('type')
   const nameCell = renderCell('name')
   const statusCell = renderCell('status')
+  const probeCell = renderCell('probe')
   const actionsCell = renderCell('actions')
   const priorityCell = renderCell('priority')
   const weightCell = renderCell('weight')
@@ -103,6 +104,7 @@ function ChannelCardComponent({
             <div className='min-w-0 overflow-hidden'>{typeCell}</div>
           </div>
           <div className='flex shrink-0 items-center gap-1.5'>
+            {probeCell}
             {showStatusBadge && statusCell}
             {actionsCell}
           </div>
