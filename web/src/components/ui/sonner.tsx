@@ -19,58 +19,84 @@ For commercial licensing, please contact support@quantumnous.com
 'use client'
 
 import {
+  Alert02Icon,
   CheckmarkCircle02Icon,
   InformationCircleIcon,
-  Alert02Icon,
-  MultiplicationSignCircleIcon,
   Loading03Icon,
+  MultiplicationSignCircleIcon,
 } from '@hugeicons/core-free-icons'
 import { HugeiconsIcon } from '@hugeicons/react'
+import { useRouterState } from '@tanstack/react-router'
 import { Toaster as Sonner, type ToasterProps } from 'sonner'
 
 import { useTheme } from '@/context/theme-provider'
 
+const AUTH_HEADER_OFFSET = '4.25rem'
+const CONSOLE_HEADER_OFFSET = '4.75rem'
+
 const Toaster = (props: ToasterProps) => {
   const { resolvedTheme } = useTheme()
+  const isAuthPage = useRouterState({
+    select: (state) => {
+      const pathname = state.location.pathname
+      return (
+        pathname === '/sign-in' ||
+        pathname === '/sign-up' ||
+        pathname === '/register' ||
+        pathname === '/forgot-password' ||
+        pathname === '/reset' ||
+        pathname === '/otp' ||
+        pathname.startsWith('/oauth') ||
+        pathname.startsWith('/user/reset')
+      )
+    },
+  })
+  const headerOffset = isAuthPage ? AUTH_HEADER_OFFSET : CONSOLE_HEADER_OFFSET
 
   return (
     <Sonner
       theme={resolvedTheme}
       className='toaster group'
+      position='top-center'
+      closeButton={false}
+      duration={5000}
+      gap={8}
+      offset={{ top: headerOffset }}
+      mobileOffset={{ top: headerOffset }}
       icons={{
         success: (
           <HugeiconsIcon
             icon={CheckmarkCircle02Icon}
             strokeWidth={2}
-            className='size-4'
+            className='size-3.5'
           />
         ),
         info: (
           <HugeiconsIcon
             icon={InformationCircleIcon}
             strokeWidth={2}
-            className='size-4'
+            className='size-3.5'
           />
         ),
         warning: (
           <HugeiconsIcon
             icon={Alert02Icon}
             strokeWidth={2}
-            className='size-4'
+            className='size-3.5'
           />
         ),
         error: (
           <HugeiconsIcon
             icon={MultiplicationSignCircleIcon}
             strokeWidth={2}
-            className='size-4'
+            className='size-3.5'
           />
         ),
         loading: (
           <HugeiconsIcon
             icon={Loading03Icon}
             strokeWidth={2}
-            className='size-4 animate-spin'
+            className='size-3.5 animate-spin'
           />
         ),
       }}
@@ -79,26 +105,8 @@ const Toaster = (props: ToasterProps) => {
           '--normal-bg': 'var(--popover)',
           '--normal-text': 'var(--popover-foreground)',
           '--normal-border': 'var(--border)',
-          '--success-bg':
-            'color-mix(in oklch, var(--success) 16%, var(--popover))',
-          '--success-border':
-            'color-mix(in oklch, var(--success) 35%, var(--border))',
-          '--success-text': 'var(--success)',
-          '--info-bg': 'color-mix(in oklch, var(--info) 16%, var(--popover))',
-          '--info-border':
-            'color-mix(in oklch, var(--info) 35%, var(--border))',
-          '--info-text': 'var(--info)',
-          '--warning-bg':
-            'color-mix(in oklch, var(--warning) 18%, var(--popover))',
-          '--warning-border':
-            'color-mix(in oklch, var(--warning) 38%, var(--border))',
-          '--warning-text': 'var(--warning)',
-          '--error-bg':
-            'color-mix(in oklch, var(--destructive) 16%, var(--popover))',
-          '--error-border':
-            'color-mix(in oklch, var(--destructive) 35%, var(--border))',
-          '--error-text': 'var(--destructive)',
           '--border-radius': 'var(--radius)',
+          '--width': '100%',
         } as React.CSSProperties
       }
       {...props}

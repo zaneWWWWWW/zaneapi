@@ -234,8 +234,9 @@ const (
 
 // Rate limit related messages
 const (
-	MsgRateLimitReached      = "rate_limit.reached"
-	MsgRateLimitTotalReached = "rate_limit.total_reached"
+	MsgRateLimitReached         = "rate_limit.reached"
+	MsgRateLimitTotalReached    = "rate_limit.total_reached"
+	MsgRateLimitTooManyRequests = "rate_limit.too_many_requests"
 )
 
 // Setting related messages

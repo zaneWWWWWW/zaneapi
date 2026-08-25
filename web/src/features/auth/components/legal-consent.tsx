@@ -16,7 +16,7 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 For commercial licensing, please contact support@quantumnous.com
 */
-import { useTranslation } from 'react-i18next'
+import { Trans, useTranslation } from 'react-i18next'
 
 import { Checkbox } from '@/components/ui/checkbox'
 import { Label } from '@/components/ui/label'
@@ -30,6 +30,24 @@ interface LegalConsentProps {
   onCheckedChange: (nextValue: boolean) => void
   className?: string
 }
+
+const agreementLink = (
+  <a
+    href='/user-agreement'
+    target='_blank'
+    rel='noopener noreferrer'
+    className='text-primary hover:underline'
+  />
+)
+
+const privacyLink = (
+  <a
+    href='/privacy-policy'
+    target='_blank'
+    rel='noopener noreferrer'
+    className='text-primary hover:underline'
+  />
+)
 
 export function LegalConsent({
   status,
@@ -45,8 +63,14 @@ export function LegalConsent({
     return null
   }
 
-  const handleChange = (value: boolean) => {
-    onCheckedChange(value === true)
+  let i18nKey =
+    'I have read and agree to the <privacy>Privacy Policy</privacy>.'
+  if (hasUserAgreement && hasPrivacyPolicy) {
+    i18nKey =
+      'I have read and agree to the <agreement>User Agreement</agreement> and the <privacy>Privacy Policy</privacy>.'
+  } else if (hasUserAgreement) {
+    i18nKey =
+      'I have read and agree to the <agreement>User Agreement</agreement>.'
   }
 
   return (
@@ -59,7 +83,7 @@ export function LegalConsent({
       <Checkbox
         id='legal-consent'
         checked={checked}
-        onCheckedChange={handleChange}
+        onCheckedChange={(value) => onCheckedChange(value === true)}
         className='mt-0.5'
       />
       <Label
@@ -67,29 +91,14 @@ export function LegalConsent({
         className='text-muted-foreground items-start gap-1 text-left text-xs leading-5 font-normal'
       >
         <span>
-          {t('I have read and agree to the')}{' '}
-          {hasUserAgreement && (
-            <a
-              href='/user-agreement'
-              target='_blank'
-              rel='noopener noreferrer'
-              className='text-primary hover:underline'
-            >
-              {t('User Agreement')}
-            </a>
-          )}
-          {hasUserAgreement && hasPrivacyPolicy && ' and the '}
-          {hasPrivacyPolicy && (
-            <a
-              href='/privacy-policy'
-              target='_blank'
-              rel='noopener noreferrer'
-              className='text-primary hover:underline'
-            >
-              {t('Privacy Policy')}
-            </a>
-          )}
-          .
+          <Trans
+            t={t}
+            i18nKey={i18nKey}
+            components={{
+              agreement: agreementLink,
+              privacy: privacyLink,
+            }}
+          />
         </span>
       </Label>
     </div>

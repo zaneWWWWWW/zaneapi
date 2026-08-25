@@ -19,7 +19,10 @@ For commercial licensing, please contact support@quantumnous.com
 import assert from 'node:assert/strict'
 import { describe, test } from 'node:test'
 
-import { isPublicPathAfterAuthLoss } from './http-client'
+import {
+  isPublicPathAfterAuthLoss,
+  resolveHttpErrorToastMessage,
+} from './http-client'
 
 describe('session-loss navigation', () => {
   test('keeps anonymous users on the homepage and other public pages', () => {
@@ -28,6 +31,8 @@ describe('session-loss navigation', () => {
     assert.equal(isPublicPathAfterAuthLoss('/sign-up'), true)
     assert.equal(isPublicPathAfterAuthLoss('/oauth/github'), true)
     assert.equal(isPublicPathAfterAuthLoss('/privacy-policy'), true)
+    assert.equal(isPublicPathAfterAuthLoss('/about'), true)
+    assert.equal(isPublicPathAfterAuthLoss('/docs'), true)
     assert.equal(isPublicPathAfterAuthLoss('/pricing'), true)
     assert.equal(isPublicPathAfterAuthLoss('/rankings'), true)
   })
@@ -37,5 +42,29 @@ describe('session-loss navigation', () => {
     assert.equal(isPublicPathAfterAuthLoss('/dashboard'), false)
     assert.equal(isPublicPathAfterAuthLoss('/keys'), false)
     assert.equal(isPublicPathAfterAuthLoss('/system-settings/site/system-info'), false)
+  })
+})
+
+describe('HTTP error toasts', () => {
+  test('maps empty 429 responses to a rate-limit message', () => {
+    assert.equal(
+      resolveHttpErrorToastMessage({
+        response: { status: 429, data: '' },
+        message: 'Request failed with status code 429',
+      }),
+      'Too many requests'
+    )
+  })
+
+  test('keeps business error text for non-429 responses', () => {
+    assert.equal(
+      resolveHttpErrorToastMessage({
+        response: {
+          status: 200,
+          data: { success: false, message: '用户名或密码错误，或用户已被封禁' },
+        },
+      }),
+      '用户名或密码错误，或用户已被封禁'
+    )
   })
 })

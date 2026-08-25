@@ -8,6 +8,7 @@ import (
 	"strconv"
 
 	"github.com/QuantumNous/new-api/common"
+	"github.com/QuantumNous/new-api/i18n"
 	"github.com/QuantumNous/new-api/logger"
 	"github.com/gin-gonic/gin"
 )
@@ -140,7 +141,14 @@ func writeRateLimited(c *gin.Context, retryAfterSeconds int64) {
 	if retryAfterSeconds > 0 {
 		c.Header("Retry-After", strconv.FormatInt(retryAfterSeconds, 10))
 	}
-	c.Status(http.StatusTooManyRequests)
+	message := i18n.T(c, i18n.MsgRateLimitTooManyRequests)
+	if message == "" || message == i18n.MsgRateLimitTooManyRequests {
+		message = "Too many requests. Please try again later."
+	}
+	c.JSON(http.StatusTooManyRequests, gin.H{
+		"success": false,
+		"message": message,
+	})
 	c.Abort()
 }
 
@@ -174,6 +182,13 @@ func GlobalAPIRateLimit() func(c *gin.Context) {
 func CriticalRateLimit() func(c *gin.Context) {
 	if common.CriticalRateLimitEnable {
 		return rateLimitFactory(common.CriticalRateLimitNum, common.CriticalRateLimitDuration, "CT")
+	}
+	return defNext
+}
+
+func AuthRateLimit() func(c *gin.Context) {
+	if common.CriticalRateLimitEnable {
+		return rateLimitFactory(common.CriticalRateLimitNum, common.CriticalRateLimitDuration, "AUTH")
 	}
 	return defNext
 }

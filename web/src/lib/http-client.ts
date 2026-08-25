@@ -79,10 +79,45 @@ const PUBLIC_PATHS_AFTER_AUTH_LOSS = [
   '/privacy-policy',
   '/user-agreement',
   '/about',
+  '/docs',
   '/setup',
   '/pricing',
   '/rankings',
 ]
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return Boolean(value) && typeof value === 'object'
+}
+
+function translateToast(key: string): string {
+  const value = t(key)
+  return typeof value === 'string' && value.trim() ? value : key
+}
+
+export function resolveHttpErrorToastMessage(error: {
+  response?: { status?: number; data?: unknown }
+  message?: string
+}): string {
+  const messageKey = getServerErrorMessageKey(error)
+  if (messageKey) return translateToast(messageKey)
+
+  const status = error.response?.status
+  if (status === 429) {
+    return translateToast('Too many requests')
+  }
+
+  const data = error.response?.data
+  if (isRecord(data) && typeof data.message === 'string' && data.message.trim()) {
+    return data.message
+  }
+
+  const fallback = error.message?.trim() ?? ''
+  if (fallback && !/^Request failed with status code \d+$/.test(fallback)) {
+    return fallback
+  }
+
+  return translateToast('Request failed')
+}
 
 export function isPublicPathAfterAuthLoss(pathname: string): boolean {
   const path = pathname.split('?')[0]?.split('#')[0] || '/'
@@ -157,13 +192,7 @@ api.interceptors.response.use(
         toast.error(t('Session expired!'))
       }
     } else if (!skipErrorHandler) {
-      const messageKey = getServerErrorMessageKey(error)
-      const message = messageKey
-        ? t(messageKey)
-        : error?.response?.data?.message ||
-          error?.message ||
-          t('Request failed')
-      toast.error(message)
+      toast.error(resolveHttpErrorToastMessage(error))
     }
     throw error
   }
