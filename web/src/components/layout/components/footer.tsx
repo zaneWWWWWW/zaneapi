@@ -22,6 +22,7 @@ import { useTranslation } from 'react-i18next'
 
 import { useStatus } from '@/hooks/use-status'
 import { useSystemConfig } from '@/hooks/use-system-config'
+import { parseHeaderNavModulesFromStatus } from '@/lib/nav-modules'
 import { cn } from '@/lib/utils'
 
 interface FooterLink {
@@ -163,43 +164,35 @@ export function Footer(props: FooterProps) {
   const isDemoSiteMode = Boolean(demoSiteEnabled)
   const currentYear = new Date().getFullYear()
 
-  const fallbackColumns = useMemo<FooterColumnProps[]>(
-    () => [
-      {
-        title: t('footer.columns.about.title'),
-        links: [
-          {
-            text: t('footer.columns.about.links.aboutProject'),
-            href: 'https://docs.newapi.pro/wiki/project-introduction/',
-          },
-          {
-            text: t('footer.columns.about.links.contact'),
-            href: 'https://docs.newapi.pro/support/community-interaction/',
-          },
-          {
-            text: t('footer.columns.about.links.features'),
-            href: 'https://docs.newapi.pro/wiki/features-introduction/',
-          },
-        ],
-      },
-      {
-        title: t('footer.columns.docs.title'),
-        links: [
-          {
-            text: t('footer.columns.docs.links.quickStart'),
-            href: 'https://docs.newapi.pro/getting-started/',
-          },
-          {
-            text: t('footer.columns.docs.links.installation'),
-            href: 'https://docs.newapi.pro/installation/',
-          },
-          {
-            text: t('footer.columns.docs.links.apiDocs'),
-            href: 'https://docs.newapi.pro/api/',
-          },
-        ],
-      },
-      {
+  const { status } = useStatus()
+  const navModules = parseHeaderNavModulesFromStatus(
+    status as Record<string, unknown> | null
+  )
+  const showAgreement = Boolean(status?.user_agreement_enabled)
+  const showPrivacy = Boolean(status?.privacy_policy_enabled)
+  const showAbout = navModules.about !== false
+  const showDocs = navModules.docs !== false
+
+  const fallbackColumns = useMemo<FooterColumnProps[]>(() => {
+    const columns: FooterColumnProps[] = []
+    if (showAbout) {
+      const aboutLinks: FooterLink[] = [{ text: 'About', href: '/about' }]
+      if (showAgreement) {
+        aboutLinks.push({ text: 'User Agreement', href: '/user-agreement' })
+      }
+      if (showPrivacy) {
+        aboutLinks.push({ text: 'Privacy Policy', href: '/privacy-policy' })
+      }
+      columns.push({ title: 'About', links: aboutLinks })
+    }
+    if (showDocs) {
+      columns.push({
+        title: 'Docs',
+        links: [{ text: 'API integration', href: '/docs' }],
+      })
+    }
+    if (isDemoSiteMode) {
+      columns.push({
         title: t('footer.columns.related.title'),
         links: [
           {
@@ -215,10 +208,17 @@ export function Footer(props: FooterProps) {
             href: 'https://github.com/Calcium-Ion/new-api-key-tool',
           },
         ],
-      },
-    ],
-    [t]
-  )
+      })
+    }
+    return columns
+  }, [
+    isDemoSiteMode,
+    showAbout,
+    showAgreement,
+    showDocs,
+    showPrivacy,
+    t,
+  ])
 
   const displayColumns = props.columns ?? fallbackColumns
 
@@ -270,24 +270,28 @@ export function Footer(props: FooterProps) {
           </div>
 
           {/* Links columns */}
-          {isDemoSiteMode && (
-            <div className='grid grid-cols-3 gap-8 md:gap-16'>
-              {displayColumns.map((column, index) => (
-                <div key={index}>
-                  <p className='text-muted-foreground/50 mb-3 text-xs font-medium tracking-wider uppercase'>
-                    {t(column.title)}
-                  </p>
-                  <ul className='space-y-2.5'>
-                    {column.links.map((link, linkIndex) => (
-                      <li key={linkIndex}>
-                        <FooterLinkItem link={link} />
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              ))}
-            </div>
-          )}
+          <div
+            className={
+              displayColumns.length > 2
+                ? 'grid grid-cols-2 gap-8 sm:grid-cols-3 md:gap-16'
+                : 'grid grid-cols-2 gap-8 md:gap-16'
+            }
+          >
+            {displayColumns.map((column) => (
+              <div key={column.title}>
+                <p className='text-muted-foreground/50 mb-3 text-xs font-medium tracking-wider uppercase'>
+                  {t(column.title)}
+                </p>
+                <ul className='space-y-2.5'>
+                  {column.links.map((link) => (
+                    <li key={`${column.title}-${link.href}`}>
+                      <FooterLinkItem link={link} />
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ))}
+          </div>
         </div>
 
         {/* Copyright + optional legal links inline on the left, project

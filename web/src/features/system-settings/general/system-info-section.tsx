@@ -53,6 +53,7 @@ const _systemInfoSchema = z.object({
   Logo: z.string().url().optional().or(z.literal('')),
   Footer: z.string().optional(),
   About: z.string().optional(),
+  Docs: z.string().optional(),
   HomePageContent: z.string().optional(),
   HomePageDisplayedGroups: z.string().optional(),
   legal: z.object({
@@ -67,6 +68,7 @@ type SystemInfoSectionProps = {
   defaultValues: SystemInfoFormValues
   groupRatio?: string
   userUsableGroups?: string
+  legacyAboutExtras?: boolean
 }
 
 function parseJsonRecord(value: string | undefined): Record<string, unknown> {
@@ -109,6 +111,7 @@ export function SystemInfoSection(props: SystemInfoSectionProps) {
     Logo: normalizeValue(defaultValues.Logo),
     Footer: normalizeValue(defaultValues.Footer),
     About: normalizeValue(defaultValues.About),
+    Docs: normalizeValue(defaultValues.Docs),
     HomePageContent: normalizeValue(defaultValues.HomePageContent),
     HomePageDisplayedGroups: normalizeValue(
       defaultValues.HomePageDisplayedGroups
@@ -127,6 +130,7 @@ export function SystemInfoSection(props: SystemInfoSectionProps) {
     Logo: z.string().url().optional().or(z.literal('')),
     Footer: z.string().optional(),
     About: z.string().optional(),
+    Docs: z.string().optional(),
     HomePageContent: z.string().optional(),
     HomePageDisplayedGroups: z.string().optional(),
     legal: z.object({
@@ -159,7 +163,15 @@ export function SystemInfoSection(props: SystemInfoSectionProps) {
       >,
       defaultValues: normalizedDefaults,
       onSubmit: async (_data, changedFields) => {
-        for (const [key, value] of Object.entries(changedFields)) {
+        const nextChanged: Record<string, unknown> = { ...changedFields }
+        if (props.legacyAboutExtras) {
+          if (!Object.hasOwn(nextChanged, 'About')) {
+            nextChanged.About = normalizedDefaults.About
+          }
+          nextChanged.AboutCommitments = ''
+          nextChanged.AboutContact = ''
+        }
+        for (const [key, value] of Object.entries(nextChanged)) {
           let v = normalizeValue(value)
           if (key === 'ServerAddress') {
             v = v.replace(/\/+$/, '')
@@ -266,30 +278,59 @@ export function SystemInfoSection(props: SystemInfoSectionProps) {
                 )}
               />
 
-              <FormField
-                control={form.control}
-                name='About'
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>{t('About')}</FormLabel>
-                    <FormControl>
-                      <Textarea
-                        placeholder={t(
-                          'Enter HTML code (e.g., <p>About us...</p>) or a URL (e.g., https://example.com) to embed as iframe'
+              <SettingsFormGridItem span='full'>
+                <FormField
+                  control={form.control}
+                  name='About'
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>{t('About content')}</FormLabel>
+                      <FormControl>
+                        <Textarea
+                          placeholder={t(
+                            'Paste a full Markdown document as the main About page content. HTML or a URL also works.'
+                          )}
+                          rows={12}
+                          {...field}
+                        />
+                      </FormControl>
+                      <FormDescription>
+                        {t(
+                          'This Markdown (or HTML/URL) is the main content block on the About page.'
                         )}
-                        rows={4}
-                        {...field}
-                      />
-                    </FormControl>
-                    <FormDescription>
-                      {t(
-                        'Supports HTML markup or iframe embedding. Enter HTML code directly, or provide a complete URL to automatically embed it as an iframe.'
-                      )}
-                    </FormDescription>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
+                      </FormDescription>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </SettingsFormGridItem>
+
+              <SettingsFormGridItem span='full'>
+                <FormField
+                  control={form.control}
+                  name='Docs'
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>{t('Docs content')}</FormLabel>
+                      <FormControl>
+                        <Textarea
+                          placeholder={t(
+                            'Paste a full Markdown document as the main Docs page content. HTML or a URL also works.'
+                          )}
+                          rows={12}
+                          {...field}
+                        />
+                      </FormControl>
+                      <FormDescription>
+                        {t(
+                          'This Markdown (or HTML/URL) is the main content block on the API integration page. If empty, the built-in quick start is shown.'
+                        )}
+                      </FormDescription>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </SettingsFormGridItem>
 
               <SettingsFormGridItem span='full'>
                 <FormField

@@ -112,6 +112,9 @@ export type SiteSettings = {
   Logo: string
   Footer: string
   About: string
+  AboutCommitments: string
+  AboutContact: string
+  Docs: string
   HomePageContent: string
   HomePageDisplayedGroups: string
   GroupRatio: string
@@ -253,7 +256,6 @@ export type BillingSettings = {
   QuotaForInviter: number
   QuotaForInvitee: number
   TopUpLink: string
-  'general_setting.docs_link': string
   'quota_setting.enable_free_model_pre_consume': boolean
   QuotaPerUnit: number
   USDExchangeRate: number

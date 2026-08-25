@@ -73,17 +73,8 @@ export function SidebarAccount() {
   const navModules = parseHeaderNavModulesFromStatus(
     status as Record<string, unknown> | null
   )
-  const docsLink = status?.docs_link as string | undefined
   const showDocs = navModules.docs !== false
   const showAbout = navModules.about !== false
-
-  const handleOpenDocs = useCallback(() => {
-    if (docsLink) {
-      window.open(docsLink, '_blank', 'noopener,noreferrer')
-      return
-    }
-    window.location.assign('/docs')
-  }, [docsLink])
 
   const handleChangeLanguage = useCallback(
     async (code: string) => {
@@ -234,7 +225,7 @@ export function SidebarAccount() {
             <>
               <DropdownMenuSeparator />
               {showDocs && (
-                <DropdownMenuItem onClick={handleOpenDocs}>
+                <DropdownMenuItem onClick={() => navigate({ to: '/docs' })}>
                   <BookOpen className='size-4' />
                   {t('Docs')}
                 </DropdownMenuItem>

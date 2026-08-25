@@ -42,7 +42,11 @@ const SITE_SECTIONS = [
           SystemName: settings.SystemName,
           Logo: settings.Logo,
           Footer: settings.Footer,
-          About: settings.About,
+          About: [settings.About, settings.AboutCommitments, settings.AboutContact]
+            .map((value) => value.trim())
+            .filter((value) => value.length > 0)
+            .join('\n\n'),
+          Docs: settings.Docs,
           HomePageContent: settings.HomePageContent,
           HomePageDisplayedGroups: settings.HomePageDisplayedGroups,
           ServerAddress: settings.ServerAddress,
@@ -51,6 +55,10 @@ const SITE_SECTIONS = [
             privacy_policy: settings['legal.privacy_policy'],
           },
         }}
+        legacyAboutExtras={
+          settings.AboutCommitments.trim() !== '' ||
+          settings.AboutContact.trim() !== ''
+        }
         groupRatio={settings.GroupRatio}
         userUsableGroups={settings.UserUsableGroups}
       />

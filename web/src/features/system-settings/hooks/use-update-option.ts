@@ -37,6 +37,8 @@ const STATUS_RELATED_KEYS = [
   'general_setting.custom_currency_symbol',
   'general_setting.custom_currency_exchange_rate',
   'HomePageDisplayedGroups',
+  'About',
+  'Docs',
 ]
 
 export function useUpdateOption() {
@@ -57,6 +59,12 @@ export function useUpdateOption() {
           } catch {
             /* empty */
           }
+        }
+        if (variables.key === 'About') {
+          queryClient.invalidateQueries({ queryKey: ['about-content'] })
+        }
+        if (variables.key === 'Docs') {
+          queryClient.invalidateQueries({ queryKey: ['docs-content'] })
         }
 
         toast.success(i18next.t('Setting updated successfully'))

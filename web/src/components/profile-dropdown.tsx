@@ -18,7 +18,9 @@ For commercial licensing, please contact support@quantumnous.com
 */
 import { useNavigate } from '@tanstack/react-router'
 import {
+  BookOpen,
   Check,
+  Info,
   Languages,
   LayoutDashboard,
   LogOut,
@@ -44,6 +46,7 @@ import {
 } from '@/components/ui/dropdown-menu'
 import { useTheme } from '@/context/theme-provider'
 import useDialogState from '@/hooks/use-dialog'
+import { useStatus } from '@/hooks/use-status'
 import { useUserDisplay } from '@/hooks/use-user-display'
 import {
   INTERFACE_LANGUAGE_OPTIONS,
@@ -51,6 +54,7 @@ import {
 } from '@/i18n/languages'
 import { api } from '@/lib/api'
 import { getUserAvatarFallback, getUserAvatarStyle } from '@/lib/avatar'
+import { parseHeaderNavModulesFromStatus } from '@/lib/nav-modules'
 import { cn } from '@/lib/utils'
 import { useAuthStore } from '@/stores/auth-store'
 
@@ -61,6 +65,12 @@ export function ProfileDropdown() {
   const navigate = useNavigate()
   const [open, setOpen] = useDialogState()
   const user = useAuthStore((state) => state.auth.user)
+  const { status } = useStatus()
+  const navModules = parseHeaderNavModulesFromStatus(
+    status as Record<string, unknown> | null
+  )
+  const showDocs = navModules.docs !== false
+  const showAbout = navModules.about !== false
   const currentLanguage = normalizeInterfaceLanguage(i18n.language)
   const handleChangeLanguage = useCallback(
     async (code: string) => {
@@ -197,6 +207,24 @@ export function ProfileDropdown() {
               ))}
             </DropdownMenuSubContent>
           </DropdownMenuSub>
+
+          {(showDocs || showAbout) && (
+            <>
+              <DropdownMenuSeparator />
+              {showDocs && (
+                <DropdownMenuItem onClick={() => navigate({ to: '/docs' })}>
+                  <BookOpen className='size-4' />
+                  {t('Docs')}
+                </DropdownMenuItem>
+              )}
+              {showAbout && (
+                <DropdownMenuItem onClick={() => navigate({ to: '/about' })}>
+                  <Info className='size-4' />
+                  {t('About')}
+                </DropdownMenuItem>
+              )}
+            </>
+          )}
 
           <DropdownMenuSeparator />
 

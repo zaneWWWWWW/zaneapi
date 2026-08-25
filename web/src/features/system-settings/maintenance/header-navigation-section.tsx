@@ -148,12 +148,14 @@ export function HeaderNavigationSection({
     {
       key: 'docs',
       title: t('Docs'),
-      description: t('Show documentation in the account menu.'),
+      description: t(
+        'Show the API integration guide in the account menu and footer.'
+      ),
     },
     {
       key: 'about',
       title: t('About'),
-      description: t('Show the About page in the account menu.'),
+      description: t('Show the About page in the account menu and footer.'),
     },
   ]
 

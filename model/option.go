@@ -72,6 +72,9 @@ func InitOptionMap() {
 	common.OptionMap["SMTPForceAuthLogin"] = strconv.FormatBool(common.SMTPForceAuthLogin)
 	common.OptionMap["Notice"] = ""
 	common.OptionMap["About"] = ""
+	common.OptionMap["AboutCommitments"] = ""
+	common.OptionMap["AboutContact"] = ""
+	common.OptionMap["Docs"] = ""
 	common.OptionMap["HomePageContent"] = ""
 	common.OptionMap["HomePageDisplayedGroups"] = "[]"
 	common.OptionMap["Footer"] = common.Footer

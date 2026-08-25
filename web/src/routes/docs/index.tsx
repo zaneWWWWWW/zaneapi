@@ -16,15 +16,10 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 For commercial licensing, please contact support@quantumnous.com
 */
-import { api } from '@/lib/api'
+import { createFileRoute } from '@tanstack/react-router'
 
-export type AboutResponse = {
-  success: boolean
-  message: string
-  data?: string
-}
+import { Docs } from '@/features/docs'
 
-export async function getAboutContent() {
-  const res = await api.get<AboutResponse>('/api/about')
-  return res.data
-}
+export const Route = createFileRoute('/docs/')({
+  component: Docs,
+})

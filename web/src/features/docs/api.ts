@@ -16,8 +16,15 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 For commercial licensing, please contact support@quantumnous.com
 */
-export type AboutResponse = {
+import { api } from '@/lib/api'
+
+export type DocsResponse = {
   success: boolean
   message: string
   data?: string
+}
+
+export async function getDocsContent() {
+  const res = await api.get<DocsResponse>('/api/docs')
+  return res.data
 }
