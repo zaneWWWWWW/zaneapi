@@ -266,9 +266,11 @@ export function SummaryCards() {
               <p className='text-muted-foreground text-xs sm:text-sm'>
                 {t('Monitor balance, usage, and request volume')}
               </p>
-              <p className='text-muted-foreground/70 text-[11px] sm:text-xs'>
-                {freshnessLabel}
-              </p>
+              {freshnessLabel ? (
+                <p className='text-muted-foreground/70 text-[11px] sm:text-xs'>
+                  {freshnessLabel}
+                </p>
+              ) : null}
             </div>
           </div>
           <StaggerContainer className='grid grid-cols-3 gap-1.5 sm:gap-3'>

@@ -217,9 +217,11 @@ export function LogStatCards(props: LogStatCardsProps) {
           )
         })}
       </div>
-      <div className='text-muted-foreground/70 border-t px-2.5 py-1.5 text-[11px] sm:px-5 sm:text-xs'>
-        {freshnessLabel}
-      </div>
+      {freshnessLabel ? (
+        <div className='text-muted-foreground/70 border-t px-2.5 py-1.5 text-[11px] sm:px-5 sm:text-xs'>
+          {freshnessLabel}
+        </div>
+      ) : null}
     </div>
   )
 }

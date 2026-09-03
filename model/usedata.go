@@ -1,8 +1,10 @@
 package model
 
 import (
+	"errors"
 	"fmt"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/QuantumNous/new-api/common"
@@ -42,7 +44,9 @@ func UpdateQuotaData() {
 	for {
 		if common.DataExportEnabled {
 			common.SysLog("正在更新数据看板数据...")
-			SaveQuotaDataCache()
+			if err := SaveQuotaDataCache(); err != nil {
+				common.SysError("保存数据看板数据失败: " + err.Error())
+			}
 		}
 		time.Sleep(time.Duration(common.DataExportInterval) * time.Minute)
 	}
@@ -50,6 +54,11 @@ func UpdateQuotaData() {
 
 var CacheQuotaData = make(map[string]*QuotaData)
 var CacheQuotaDataLock = sync.Mutex{}
+var lastQuotaDataExportAt atomic.Int64
+
+func GetLastQuotaDataExportAt() int64 {
+	return lastQuotaDataExportAt.Load()
+}
 
 func logQuotaDataCache(quotaData *QuotaData) {
 	key := fmt.Sprintf("%d\x00%s\x00%s\x00%d\x00%s\x00%d\x00%d\x00%s",
@@ -97,35 +106,41 @@ func LogQuotaData(params QuotaDataLogParams) {
 	logQuotaDataCache(quotaData)
 }
 
-func SaveQuotaDataCache() {
+func SaveQuotaDataCache() error {
 	CacheQuotaDataLock.Lock()
 	defer CacheQuotaDataLock.Unlock()
 	size := len(CacheQuotaData)
-	// 如果缓存中有数据，就保存到数据库中
-	// 1. 先查询数据库中是否有数据
-	// 2. 如果有数据，就更新数据
-	// 3. 如果没有数据，就插入数据
-	for _, quotaData := range CacheQuotaData {
-		quotaDataDB := &QuotaData{}
-		DB.Table("quota_data").
-			Where("user_id = ? and username = ? and model_name = ? and created_at = ? and use_group = ? and token_id = ? and channel_id = ? and node_name = ?",
-				quotaData.UserID, quotaData.Username, quotaData.ModelName, quotaData.CreatedAt, quotaData.UseGroup, quotaData.TokenID, quotaData.ChannelID, quotaData.NodeName).
-			First(quotaDataDB)
-		if quotaDataDB.Id > 0 {
-			//quotaDataDB.Count += quotaData.Count
-			//quotaDataDB.Quota += quotaData.Quota
-			//DB.Table("quota_data").Save(quotaDataDB)
-			increaseQuotaData(quotaData)
-		} else {
-			DB.Table("quota_data").Create(quotaData)
+	err := DB.Transaction(func(tx *gorm.DB) error {
+		for _, quotaData := range CacheQuotaData {
+			quotaDataDB := &QuotaData{}
+			result := tx.Table("quota_data").
+				Where("user_id = ? and username = ? and model_name = ? and created_at = ? and use_group = ? and token_id = ? and channel_id = ? and node_name = ?",
+					quotaData.UserID, quotaData.Username, quotaData.ModelName, quotaData.CreatedAt, quotaData.UseGroup, quotaData.TokenID, quotaData.ChannelID, quotaData.NodeName).
+				First(quotaDataDB)
+			if result.Error != nil && !errors.Is(result.Error, gorm.ErrRecordNotFound) {
+				return result.Error
+			}
+			if quotaDataDB.Id > 0 {
+				if err := increaseQuotaData(tx, quotaData); err != nil {
+					return err
+				}
+			} else if err := tx.Table("quota_data").Create(quotaData).Error; err != nil {
+				return err
+			}
 		}
+		return nil
+	})
+	if err != nil {
+		return err
 	}
 	CacheQuotaData = make(map[string]*QuotaData)
+	lastQuotaDataExportAt.Store(time.Now().Unix())
 	common.SysLog(fmt.Sprintf("保存数据看板数据成功，共保存%d条数据", size))
+	return nil
 }
 
-func increaseQuotaData(quotaData *QuotaData) {
-	err := DB.Table("quota_data").
+func increaseQuotaData(tx *gorm.DB, quotaData *QuotaData) error {
+	return tx.Table("quota_data").
 		Where("user_id = ? and username = ? and model_name = ? and created_at = ? and use_group = ? and token_id = ? and channel_id = ? and node_name = ?",
 			quotaData.UserID, quotaData.Username, quotaData.ModelName, quotaData.CreatedAt, quotaData.UseGroup, quotaData.TokenID, quotaData.ChannelID, quotaData.NodeName).
 		Updates(map[string]interface{}{
@@ -133,9 +148,6 @@ func increaseQuotaData(quotaData *QuotaData) {
 			"quota":      gorm.Expr("quota + ?", quotaData.Quota),
 			"token_used": gorm.Expr("token_used + ?", quotaData.TokenUsed),
 		}).Error
-	if err != nil {
-		common.SysLog(fmt.Sprintf("increaseQuotaData error: %s", err))
-	}
 }
 
 func GetQuotaDataByUsername(username string, startTime int64, endTime int64) (quotaData []*QuotaData, err error) {

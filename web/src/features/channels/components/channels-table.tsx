@@ -99,8 +99,7 @@ export function ChannelsTable() {
     setSensitiveVisible,
   } = useChannels()
   const { status } = useStatus()
-  const probeEnabled =
-    Boolean(status) && status?.uptime_kuma_enabled !== false
+  const probeEnabled = Boolean(status) && status?.uptime_kuma_enabled !== false
   const isMobile = useMediaQuery('(max-width: 640px)')
 
   // Table state
@@ -482,27 +481,25 @@ export function ChannelsTable() {
         ],
         preActions: (
           <>
-            <UptimeKumaToolbar
-              channelNames={channels.map((channel) => channel.name)}
-            />
-          <Tooltip>
-            <TooltipTrigger
-              render={
-                <Button
-                  variant='ghost'
-                  size='icon'
-                  onClick={() => setSensitiveVisible(!sensitiveVisible)}
-                  aria-label={sensitiveVisible ? t('Hide') : t('Show')}
-                  className='text-muted-foreground hover:text-foreground size-8'
-                />
-              }
-            >
-              {sensitiveVisible ? <Eye /> : <EyeOff />}
-            </TooltipTrigger>
-            <TooltipContent>
-              {sensitiveVisible ? t('Hide') : t('Show')}
-            </TooltipContent>
-          </Tooltip>
+            <UptimeKumaToolbar />
+            <Tooltip>
+              <TooltipTrigger
+                render={
+                  <Button
+                    variant='ghost'
+                    size='icon'
+                    onClick={() => setSensitiveVisible(!sensitiveVisible)}
+                    aria-label={sensitiveVisible ? t('Hide') : t('Show')}
+                    className='text-muted-foreground hover:text-foreground size-8'
+                  />
+                }
+              >
+                {sensitiveVisible ? <Eye /> : <EyeOff />}
+              </TooltipTrigger>
+              <TooltipContent>
+                {sensitiveVisible ? t('Hide') : t('Show')}
+              </TooltipContent>
+            </Tooltip>
           </>
         ),
       }}

@@ -88,6 +88,14 @@ export async function getChannels(
   return res.data
 }
 
+export async function getChannelNames(): Promise<{
+  success: boolean
+  data?: string[]
+}> {
+  const res = await api.get('/api/channel/names')
+  return res.data
+}
+
 /**
  * Search channels with filters
  */

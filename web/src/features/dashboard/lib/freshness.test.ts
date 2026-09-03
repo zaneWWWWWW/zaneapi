@@ -21,21 +21,12 @@ import { describe, test } from 'node:test'
 
 import {
   formatQuotaDataFreshnessMessage,
-  getQuotaDataCutoff,
+  readDataExportEnabled,
+  readDataExportLastSuccessAt,
   readDataExportIntervalMinutes,
 } from './freshness'
 
 describe('quota data freshness', () => {
-  test('floors the cutoff to the current hour', () => {
-    const now = Date.parse('2026-03-12T14:37:22Z')
-    const cutoff = getQuotaDataCutoff(now)
-    assert.equal(cutoff.getMinutes(), 0)
-    assert.equal(cutoff.getSeconds(), 0)
-    assert.equal(cutoff.getMilliseconds(), 0)
-    assert.ok(cutoff.getTime() <= now)
-    assert.ok(now - cutoff.getTime() < 60 * 60 * 1000)
-  })
-
   test('reads the export interval from status payloads', () => {
     assert.equal(readDataExportIntervalMinutes({ data_export_interval: 5 }), 5)
     assert.equal(
@@ -46,19 +37,42 @@ describe('quota data freshness', () => {
     assert.equal(readDataExportIntervalMinutes(null), null)
   })
 
-  test('includes the refresh interval when it is configured', () => {
+  test('reads the enabled flag and last successful export from status payloads', () => {
+    assert.equal(readDataExportEnabled({ enable_data_export: false }), false)
+    assert.equal(
+      readDataExportLastSuccessAt({
+        data: { data_export_last_success_at: '1234' },
+      }),
+      1234
+    )
+    assert.equal(readDataExportEnabled(null), null)
+    assert.equal(readDataExportLastSuccessAt({}), null)
+  })
+
+  test('reports a disabled export instead of inventing a cutoff time', () => {
+    const message = formatQuotaDataFreshnessMessage((key) => key, {
+      status: { enable_data_export: false },
+    })
+    assert.equal(message, 'Dashboard data export is disabled.')
+  })
+
+  test('reports the actual last export time and interval', () => {
     const message = formatQuotaDataFreshnessMessage((key, options) => {
       if (
         key ===
-        'Data through {{time}}. Updated about every {{minutes}} minutes.'
+        'Data last exported at {{time}}. Updated about every {{minutes}} minutes.'
       ) {
-        return `through ${options?.time}; every ${options?.minutes}`
+        return `exported ${options?.time}; every ${options?.minutes}`
       }
       return key
     }, {
-      now: Date.parse('2026-03-12T14:37:22Z'),
-      status: { data_export_interval: 5 },
+      status: {
+        enable_data_export: true,
+        data_export_last_success_at: Date.parse('2026-03-12T14:37:22Z') / 1000,
+        data_export_interval: 5,
+      },
     })
-    assert.match(message, /every 5/)
+    assert.match(message ?? '', /exported/)
+    assert.match(message ?? '', /every 5/)
   })
 })

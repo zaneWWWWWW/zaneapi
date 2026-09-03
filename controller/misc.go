@@ -84,6 +84,7 @@ func GetStatus(c *gin.Context) {
 		"enable_data_export":            common.DataExportEnabled,
 		"data_export_default_time":      common.DataExportDefaultTime,
 		"data_export_interval":          common.DataExportInterval,
+		"data_export_last_success_at":   model.GetLastQuotaDataExportAt(),
 		"default_collapse_sidebar":      common.DefaultCollapseSidebar,
 		"mj_notify_enabled":             setting.MjNotifyEnabled,
 		"chats":                         setting.Chats,

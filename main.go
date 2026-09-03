@@ -226,7 +226,9 @@ func main() {
 	}
 	// 内存中的看板数据保存入库，避免重启丢失未落库数据 (issue #5679)
 	if common.DataExportEnabled {
-		model.SaveQuotaDataCache()
+		if err := model.SaveQuotaDataCache(); err != nil {
+			common.SysError("failed to save dashboard data during shutdown: " + err.Error())
+		}
 	}
 	common.SysLog("server exited")
 }

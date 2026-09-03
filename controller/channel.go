@@ -97,6 +97,16 @@ func GetChannelOps(c *gin.Context) {
 	})
 }
 
+func GetChannelNames(c *gin.Context) {
+	names, err := model.GetAllChannelNames()
+	if err != nil {
+		common.SysError("failed to get channel names: " + err.Error())
+		c.JSON(http.StatusOK, gin.H{"success": false, "message": "获取渠道名称失败，请稍后重试"})
+		return
+	}
+	common.ApiSuccess(c, names)
+}
+
 func GetAllChannels(c *gin.Context) {
 	pageInfo := common.GetPageQuery(c)
 	channelData := make([]*model.Channel, 0)

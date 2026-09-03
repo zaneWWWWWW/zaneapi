@@ -21,6 +21,7 @@ func TestBuildGroupAvailabilityUsesCurrentBucketAndHoursWindow(t *testing.T) {
 
 	result := buildGroupAvailability(
 		[]string{"vip", "default", "empty"},
+		nil,
 		currentBucket,
 		24,
 		3600,
@@ -57,6 +58,7 @@ func TestBuildGroupAvailabilityUsesCurrentBucketAndHoursWindow(t *testing.T) {
 func TestBuildGroupAvailabilitySortsByTrafficThenName(t *testing.T) {
 	result := buildGroupAvailability(
 		[]string{"beta", "alpha", "vip"},
+		nil,
 		100,
 		24,
 		3600,
@@ -71,4 +73,28 @@ func TestBuildGroupAvailabilitySortsByTrafficThenName(t *testing.T) {
 	assert.Equal(t, "vip", result.Groups[0].Group)
 	assert.Equal(t, "alpha", result.Groups[1].Group)
 	assert.Equal(t, "beta", result.Groups[2].Group)
+}
+
+func TestBuildGroupAvailabilityAggregatesAutoAcrossActualGroups(t *testing.T) {
+	result := buildGroupAvailability(
+		[]string{"auto", "default"},
+		[]string{"default", "vip"},
+		100,
+		24,
+		3600,
+		map[string]map[int64]counters{
+			"default": {100: {requestCount: 4, successCount: 3}},
+			"vip":     {100: {requestCount: 6, successCount: 6}},
+		},
+	)
+
+	byName := map[string]GroupAvailability{}
+	for _, group := range result.Groups {
+		byName[group.Group] = group
+	}
+
+	require.NotNil(t, byName["auto"].CurrentSuccessRate)
+	assert.Equal(t, 90.0, *byName["auto"].CurrentSuccessRate)
+	assert.Equal(t, int64(10), byName["auto"].CurrentRequestCount)
+	assert.Equal(t, int64(10), byName["auto"].HoursRequestCount)
 }

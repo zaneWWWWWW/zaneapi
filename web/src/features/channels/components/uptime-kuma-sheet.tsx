@@ -41,7 +41,7 @@ import {
 } from '@/features/system-settings/hooks/use-system-options'
 import { cn } from '@/lib/utils'
 
-import { getUptimeStatus } from '../api'
+import { getChannelNames, getUptimeStatus } from '../api'
 import {
   flattenUptimeMonitors,
   listUnmatchedMonitors,
@@ -59,7 +59,6 @@ const KUMA_OPTION_DEFAULTS = {
 type UptimeKumaSheetProps = {
   open: boolean
   onOpenChange: (open: boolean) => void
-  channelNames: string[]
 }
 
 function MonitorRow(props: { monitor: UptimeMonitor }) {
@@ -81,10 +80,14 @@ function MonitorRow(props: { monitor: UptimeMonitor }) {
 export function UptimeKumaSheet(props: UptimeKumaSheetProps) {
   const { t } = useTranslation()
   const optionsQuery = useSystemOptions()
-  const settings = getOptionValue(
-    optionsQuery.data?.data,
-    KUMA_OPTION_DEFAULTS
-  )
+  const channelNamesQuery = useQuery({
+    queryKey: ['channel-names'],
+    queryFn: getChannelNames,
+    enabled: props.open,
+    staleTime: 60 * 1000,
+    retry: false,
+  })
+  const settings = getOptionValue(optionsQuery.data?.data, KUMA_OPTION_DEFAULTS)
   const statusQuery = useQuery({
     queryKey: ['uptime-kuma-status'],
     queryFn: getUptimeStatus,
@@ -94,12 +97,17 @@ export function UptimeKumaSheet(props: UptimeKumaSheetProps) {
   })
 
   const groups = statusQuery.data?.data ?? []
-  const matchedNames = new Set(props.channelNames.map(normalizeProbeName))
+  const matchedNames = new Set(
+    (channelNamesQuery.data?.data ?? []).map(normalizeProbeName)
+  )
   const allMonitors = flattenUptimeMonitors(groups)
   const matchedMonitors = allMonitors.filter((monitor) =>
     matchedNames.has(normalizeProbeName(monitor.name))
   )
-  const unmatchedMonitors = listUnmatchedMonitors(groups, props.channelNames)
+  const unmatchedMonitors = listUnmatchedMonitors(
+    groups,
+    channelNamesQuery.data?.data ?? []
+  )
 
   let statusContent
   if (!settings['console_setting.uptime_kuma_enabled']) {
@@ -109,6 +117,10 @@ export function UptimeKumaSheet(props: UptimeKumaSheetProps) {
       </p>
     )
   } else if (statusQuery.isLoading) {
+    statusContent = (
+      <p className='text-muted-foreground text-sm'>{t('Loading...')}</p>
+    )
+  } else if (channelNamesQuery.isLoading) {
     statusContent = (
       <p className='text-muted-foreground text-sm'>{t('Loading...')}</p>
     )

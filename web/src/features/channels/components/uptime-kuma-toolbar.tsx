@@ -30,13 +30,10 @@ import {
 import { useStatus } from '@/hooks/use-status'
 
 import { getUptimeStatus } from '../api'
-import {
-  flattenUptimeMonitors,
-  summarizeProbes,
-} from '../lib/uptime-match'
+import { flattenUptimeMonitors, summarizeProbes } from '../lib/uptime-match'
 import { UptimeKumaSheet } from './uptime-kuma-sheet'
 
-export function UptimeKumaToolbar(props: { channelNames: string[] }) {
+export function UptimeKumaToolbar() {
   const { t } = useTranslation()
   const { status } = useStatus()
   const enabled = Boolean(status) && status?.uptime_kuma_enabled !== false
@@ -48,9 +45,7 @@ export function UptimeKumaToolbar(props: { channelNames: string[] }) {
     staleTime: 60 * 1000,
     retry: false,
   })
-  const summary = summarizeProbes(
-    flattenUptimeMonitors(statusQuery.data?.data)
-  )
+  const summary = summarizeProbes(flattenUptimeMonitors(statusQuery.data?.data))
 
   let label = t('Probes')
   if (enabled && summary.total > 0) {
@@ -80,11 +75,7 @@ export function UptimeKumaToolbar(props: { channelNames: string[] }) {
             : t('Configure Uptime Kuma')}
         </TooltipContent>
       </Tooltip>
-      <UptimeKumaSheet
-        open={open}
-        onOpenChange={setOpen}
-        channelNames={props.channelNames}
-      />
+      <UptimeKumaSheet open={open} onOpenChange={setOpen} />
     </>
   )
 }

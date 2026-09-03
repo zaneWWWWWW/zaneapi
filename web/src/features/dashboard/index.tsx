@@ -210,6 +210,7 @@ export function Dashboard() {
     (preferences: DashboardChartPreferences) => {
       setChartPreferences(preferences)
       setModelFilters(buildDefaultDashboardFilters(preferences))
+      setFlowFilters(buildDefaultDashboardFilters(preferences))
       saveChartPreferences(preferences)
     },
     []

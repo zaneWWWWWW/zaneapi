@@ -43,7 +43,11 @@ func GetPerfMetricsGroups(c *gin.Context) {
 		descriptions[groupName] = userUsableGroups[groupName]
 	}
 
-	result, err := perfmetrics.QueryGroupAvailability(hours, groupNames)
+	result, err := perfmetrics.QueryGroupAvailability(
+		hours,
+		groupNames,
+		lo.Keys(ratioGroups),
+	)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{
 			"success": false,

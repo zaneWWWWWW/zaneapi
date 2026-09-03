@@ -365,6 +365,12 @@ func GetAllChannels(startIdx int, num int, selectAll bool, idSort bool, sortOpti
 	return channels, err
 }
 
+func GetAllChannelNames() ([]string, error) {
+	var names []string
+	err := DB.Model(&Channel{}).Select("name").Order("id ASC").Find(&names).Error
+	return names, err
+}
+
 func GetChannelsByTag(tag string, idSort bool, selectAll bool, sortOptions ...ChannelSortOptions) ([]*Channel, error) {
 	var channels []*Channel
 	order := resolveChannelSortOptions(idSort, sortOptions)

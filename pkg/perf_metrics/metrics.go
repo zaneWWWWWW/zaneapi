@@ -107,9 +107,13 @@ func Query(params QueryParams) (QueryResult, error) {
 		})
 	}
 
+	activeBucket := bucketStart(endTs)
 	hotBuckets.Range(func(key, value any) bool {
 		k := key.(bucketKey)
 		if k.model != params.Model || k.bucketTs < startTs || k.bucketTs > endTs {
+			return true
+		}
+		if common.RedisEnabled && common.RDB != nil && params.Group != "" && k.bucketTs == activeBucket {
 			return true
 		}
 		if params.Group != "" && k.group != params.Group {
@@ -118,11 +122,12 @@ func Query(params QueryParams) (QueryResult, error) {
 		mergeCounters(merged, k, value.(*atomicBucket).snapshot())
 		return true
 	})
+	mergeRedisActiveBuckets(merged, params, startTs, endTs)
 
 	return buildQueryResult(params.Model, merged), nil
 }
 
-func QueryGroupAvailability(hours int, groups []string) (GroupAvailabilityResult, error) {
+func QueryGroupAvailability(hours int, groups []string, autoGroups []string) (GroupAvailabilityResult, error) {
 	if hours <= 0 {
 		hours = 24
 	}
@@ -136,10 +141,31 @@ func QueryGroupAvailability(hours int, groups []string) (GroupAvailabilityResult
 	endTs := time.Now().Unix()
 	startTs := endTs - int64(hours)*3600
 	currentBucketTs := bucketStart(endTs)
-	allowedGroups := allowedGroupSet(groups)
+	includeAuto := false
+	queryGroups := make([]string, 0, len(groups)+len(autoGroups))
+	queryGroupSet := make(map[string]struct{}, len(groups)+len(autoGroups))
+	for _, group := range groups {
+		if group == "auto" {
+			includeAuto = true
+			continue
+		}
+		if _, exists := queryGroupSet[group]; !exists {
+			queryGroupSet[group] = struct{}{}
+			queryGroups = append(queryGroups, group)
+		}
+	}
+	if includeAuto {
+		for _, group := range autoGroups {
+			if _, exists := queryGroupSet[group]; !exists {
+				queryGroupSet[group] = struct{}{}
+				queryGroups = append(queryGroups, group)
+			}
+		}
+	}
+	allowedGroups := allowedGroupSet(queryGroups)
 
 	merged := map[string]map[int64]counters{}
-	rows, err := model.GetPerfMetricsGroupBuckets(startTs, endTs, groups)
+	rows, err := model.GetPerfMetricsGroupBuckets(startTs, endTs, queryGroups)
 	if err != nil {
 		return GroupAvailabilityResult{}, err
 	}
@@ -150,9 +176,13 @@ func QueryGroupAvailability(hours int, groups []string) (GroupAvailabilityResult
 		})
 	}
 
+	activeBucket := bucketStart(endTs)
 	hotBuckets.Range(func(key, value any) bool {
 		k := key.(bucketKey)
 		if k.bucketTs < startTs || k.bucketTs > endTs {
+			return true
+		}
+		if common.RedisEnabled && common.RDB != nil && k.bucketTs == activeBucket {
 			return true
 		}
 		if allowedGroups != nil {
@@ -163,8 +193,11 @@ func QueryGroupAvailability(hours int, groups []string) (GroupAvailabilityResult
 		mergeGroupBucket(merged, k.group, k.bucketTs, value.(*atomicBucket).snapshot())
 		return true
 	})
+	if common.RedisEnabled && common.RDB != nil && activeBucket >= startTs && activeBucket <= endTs {
+		mergeRedisGroupActiveBuckets(merged, activeBucket, queryGroups)
+	}
 
-	return buildGroupAvailability(groups, currentBucketTs, hours, bucketSeconds, merged), nil
+	return buildGroupAvailability(groups, autoGroups, currentBucketTs, hours, bucketSeconds, merged), nil
 }
 
 func QuerySummaryAll(hours int, groups []string) (SummaryAllResult, error) {
@@ -330,6 +363,7 @@ func roundedSuccessRatePtr(value counters) *float64 {
 
 func buildGroupAvailability(
 	groups []string,
+	autoGroups []string,
 	currentBucketTs int64,
 	hours int,
 	bucketSeconds int64,
@@ -337,9 +371,22 @@ func buildGroupAvailability(
 ) GroupAvailabilityResult {
 	results := make([]GroupAvailability, 0, len(groups))
 	for _, group := range groups {
+		buckets := merged[group]
+		if group == "auto" {
+			buckets = make(map[int64]counters)
+			for _, autoGroup := range autoGroups {
+				groupBuckets := merged[autoGroup]
+				for ts, value := range groupBuckets {
+					current := buckets[ts]
+					current.requestCount += value.requestCount
+					current.successCount += value.successCount
+					buckets[ts] = current
+				}
+			}
+		}
 		hoursTotal := counters{}
 		current := counters{}
-		for ts, value := range merged[group] {
+		for ts, value := range buckets {
 			hoursTotal.requestCount += value.requestCount
 			hoursTotal.successCount += value.successCount
 			if ts == currentBucketTs {
@@ -499,24 +546,25 @@ func recordRedis(key bucketKey, sample Sample) {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
 	defer cancel()
 
-	redisKey := redisBucketKey(key)
 	pipe := common.RDB.TxPipeline()
-	pipe.HIncrBy(ctx, redisKey, "req", 1)
-	if sample.Success {
-		pipe.HIncrBy(ctx, redisKey, "ok", 1)
+	for _, redisKey := range []string{redisBucketKey(key), redisGroupBucketKey(key)} {
+		pipe.HIncrBy(ctx, redisKey, "req", 1)
+		if sample.Success {
+			pipe.HIncrBy(ctx, redisKey, "ok", 1)
+		}
+		if sample.LatencyMs > 0 {
+			pipe.HIncrBy(ctx, redisKey, "lat", sample.LatencyMs)
+		}
+		if sample.HasTtft && sample.TtftMs >= 0 {
+			pipe.HIncrBy(ctx, redisKey, "ttft", sample.TtftMs)
+			pipe.HIncrBy(ctx, redisKey, "ttft_n", 1)
+		}
+		if sample.OutputTokens > 0 && sample.GenerationMs > 0 {
+			pipe.HIncrBy(ctx, redisKey, "out", sample.OutputTokens)
+			pipe.HIncrBy(ctx, redisKey, "gen_ms", sample.GenerationMs)
+		}
+		pipe.Expire(ctx, redisKey, time.Hour)
 	}
-	if sample.LatencyMs > 0 {
-		pipe.HIncrBy(ctx, redisKey, "lat", sample.LatencyMs)
-	}
-	if sample.HasTtft && sample.TtftMs >= 0 {
-		pipe.HIncrBy(ctx, redisKey, "ttft", sample.TtftMs)
-		pipe.HIncrBy(ctx, redisKey, "ttft_n", 1)
-	}
-	if sample.OutputTokens > 0 && sample.GenerationMs > 0 {
-		pipe.HIncrBy(ctx, redisKey, "out", sample.OutputTokens)
-		pipe.HIncrBy(ctx, redisKey, "gen_ms", sample.GenerationMs)
-	}
-	pipe.Expire(ctx, redisKey, time.Hour)
 	_, _ = pipe.Exec(ctx)
 }
 
@@ -538,6 +586,27 @@ func mergeRedisActiveBuckets(merged map[bucketKey]counters, params QueryParams, 
 	mergeCounters(merged, key, redisCounters(values))
 }
 
+func mergeRedisGroupActiveBuckets(merged map[string]map[int64]counters, active int64, groups []string) {
+	allowed := allowedGroupSet(groups)
+	for group := range allowed {
+		mergeRedisGroupBucket(merged, group, active)
+	}
+}
+
+func mergeRedisGroupBucket(merged map[string]map[int64]counters, group string, active int64) {
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+	defer cancel()
+	values, err := common.RDB.HGetAll(ctx, redisGroupBucketKey(bucketKey{group: group, bucketTs: active})).Result()
+	if err != nil || len(values) == 0 {
+		return
+	}
+	mergeGroupBucket(merged, group, active, redisCounters(values))
+}
+
 func redisBucketKey(key bucketKey) string {
 	return fmt.Sprintf("perf:%s:%s:%d", key.model, key.group, key.bucketTs)
+}
+
+func redisGroupBucketKey(key bucketKey) string {
+	return fmt.Sprintf("perf-group:%s:%d", key.group, key.bucketTs)
 }
