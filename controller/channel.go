@@ -71,6 +71,12 @@ func clearChannelInfo(channel *model.Channel) {
 	}
 }
 
+func clearChannelProfitConfig(channel *model.Channel, role int) {
+	if role != common.RoleRootUser {
+		channel.CostRatio = nil
+	}
+}
+
 func applyChannelStatusFilter(query *gorm.DB, statusFilter int) *gorm.DB {
 	if statusFilter == common.ChannelStatusEnabled {
 		return query.Where("status = ?", common.ChannelStatusEnabled)
@@ -177,6 +183,7 @@ func GetAllChannels(c *gin.Context) {
 
 	for _, datum := range channelData {
 		clearChannelInfo(datum)
+		clearChannelProfitConfig(datum, c.GetInt("role"))
 	}
 
 	countQuery := buildChannelListQuery(groupFilter, statusFilter, -1)
@@ -390,6 +397,7 @@ func SearchChannels(c *gin.Context) {
 
 	for _, datum := range pagedData {
 		clearChannelInfo(datum)
+		clearChannelProfitConfig(datum, c.GetInt("role"))
 	}
 
 	c.JSON(http.StatusOK, gin.H{
@@ -417,6 +425,7 @@ func GetChannel(c *gin.Context) {
 	}
 	if channel != nil {
 		clearChannelInfo(channel)
+		clearChannelProfitConfig(channel, c.GetInt("role"))
 	}
 	c.JSON(http.StatusOK, gin.H{
 		"success": true,
@@ -489,6 +498,9 @@ func validateChannel(channel *model.Channel, isAdd bool) error {
 	// 校验 channel settings
 	if err := channel.ValidateSettings(); err != nil {
 		return fmt.Errorf("渠道额外设置[channel setting] 格式错误：%s", err.Error())
+	}
+	if err := channel.ValidateProfitSettings(); err != nil {
+		return err
 	}
 
 	// 如果是添加操作，检查 channel 和 key 是否为空
@@ -620,6 +632,10 @@ func AddChannel(c *gin.Context) {
 	err := c.ShouldBindJSON(&addChannelRequest)
 	if err != nil {
 		common.ApiError(c, err)
+		return
+	}
+	if addChannelRequest.Channel != nil && addChannelRequest.Channel.CostRatio != nil && c.GetInt("role") != common.RoleRootUser {
+		common.ApiErrorI18n(c, i18n.MsgAuthInsufficientPrivilege)
 		return
 	}
 
@@ -968,6 +984,10 @@ func UpdateChannel(c *gin.Context) {
 		common.ApiErrorI18n(c, i18n.MsgInvalidParams)
 		return
 	}
+	if _, ok := requestData["cost_ratio"]; ok && c.GetInt("role") != common.RoleRootUser {
+		common.ApiErrorI18n(c, i18n.MsgAuthInsufficientPrivilege)
+		return
+	}
 	clearChannelReadOnlyFields(&channel, requestData)
 
 	// 使用统一的校验函数
@@ -997,6 +1017,15 @@ func UpdateChannel(c *gin.Context) {
 
 	// Always copy the original ChannelInfo so that fields like IsMultiKey and MultiKeySize are retained.
 	channel.ChannelInfo = originChannel.ChannelInfo
+	// Profit configuration is root-only and must survive ordinary channel edits
+	// whose payloads intentionally omit it. GORM struct Updates skip nil
+	// pointers, so an explicit null from root has to be written separately.
+	clearCostRatio := false
+	if _, provided := requestData["cost_ratio"]; !provided {
+		channel.CostRatio = originChannel.CostRatio
+	} else if channel.CostRatio == nil {
+		clearCostRatio = true
+	}
 
 	if channelHasSensitiveChanges(&channel, originChannel, requestData) &&
 		!authz.Can(c.GetInt("id"), c.GetInt("role"), authz.ChannelSensitiveWrite) {
@@ -1094,6 +1123,13 @@ func UpdateChannel(c *gin.Context) {
 		common.ApiError(c, err)
 		return
 	}
+	if clearCostRatio {
+		if err := model.DB.Model(&model.Channel{}).Where("id = ?", channel.Id).Update("cost_ratio", nil).Error; err != nil {
+			common.ApiError(c, err)
+			return
+		}
+		channel.CostRatio = nil
+	}
 	model.InitChannelCache()
 	if proxyChanged {
 		service.InvalidateProxyClient(originProxy)
@@ -1122,6 +1158,7 @@ func UpdateChannel(c *gin.Context) {
 	})
 	channel.Key = ""
 	clearChannelInfo(&channel.Channel)
+	clearChannelProfitConfig(&channel.Channel, c.GetInt("role"))
 	c.JSON(http.StatusOK, gin.H{
 		"success": true,
 		"message": "",
@@ -1475,6 +1512,9 @@ func CopyChannel(c *gin.Context) {
 	if resetBalance {
 		clone.Balance = 0
 		clone.UsedQuota = 0
+	}
+	if c.GetInt("role") != common.RoleRootUser {
+		clone.CostRatio = nil
 	}
 
 	if err := clone.ValidateSettings(); err != nil {

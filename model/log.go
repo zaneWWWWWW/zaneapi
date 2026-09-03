@@ -342,10 +342,18 @@ type RecordConsumeLogParams struct {
 	IsStream         bool                   `json:"is_stream"`
 	Group            string                 `json:"group"`
 	Other            map[string]interface{} `json:"other"`
+	SkipProfit       bool                   `json:"-"`
 }
 
 func RecordConsumeLog(c *gin.Context, userId int, params RecordConsumeLogParams) {
 	if !common.LogConsumeEnabled {
+		if !params.SkipProfit {
+			eventKey := c.GetString(common.RequestIdKey)
+			if eventKey == "" {
+				eventKey = common.NewRequestId()
+			}
+			RecordChannelProfit(eventKey, params.ChannelId, params.ModelName, int64(params.Quota), common.GetTimestamp())
+		}
 		return
 	}
 	logger.LogInfo(c, fmt.Sprintf("record consume log: userId=%d, params=%s", userId, common.GetJsonString(params)))
@@ -375,9 +383,12 @@ func RecordConsumeLog(c *gin.Context, userId int, params RecordConsumeLogParams)
 		UpstreamRequestId: upstreamRequestId,
 		Other:             otherStr,
 	}
+	ensureLogRequestId(log)
 	err := createLog(log)
 	if err != nil {
 		logger.LogError(c, "failed to record log: "+err.Error())
+	} else if !params.SkipProfit {
+		RecordChannelProfit(log.RequestId, params.ChannelId, params.ModelName, int64(params.Quota), createdAt)
 	}
 	if common.DataExportEnabled {
 		LogQuotaData(QuotaDataLogParams{
@@ -410,7 +421,23 @@ type RecordTaskBillingLogParams struct {
 }
 
 func RecordTaskBillingLog(params RecordTaskBillingLogParams) {
+	eventKey := ""
+	if params.Other != nil {
+		if taskID, ok := params.Other["task_id"]; ok && taskID != nil && fmt.Sprint(taskID) != "" {
+			eventKey = fmt.Sprintf("task:%s:%d:%d", fmt.Sprint(taskID), params.LogType, params.Quota)
+			if pre, exists := params.Other["pre_consumed_quota"]; exists {
+				eventKey += fmt.Sprintf(":%v", pre)
+			}
+			if actual, exists := params.Other["actual_quota"]; exists {
+				eventKey += fmt.Sprintf(":%v", actual)
+			}
+		}
+	}
 	if params.LogType == LogTypeConsume && !common.LogConsumeEnabled {
+		if eventKey == "" {
+			eventKey = common.NewRequestId()
+		}
+		RecordChannelProfit(eventKey, params.ChannelId, params.ModelName, int64(params.Quota), common.GetTimestamp())
 		return
 	}
 	username, _ := GetUsernameById(params.UserId, false)
@@ -436,9 +463,19 @@ func RecordTaskBillingLog(params RecordTaskBillingLogParams) {
 		Ip:        params.Ip,
 		Other:     common.MapToJsonStr(params.Other),
 	}
+	ensureLogRequestId(log)
 	err := createLog(log)
 	if err != nil {
 		common.SysLog("failed to record task billing log: " + err.Error())
+	} else if params.LogType == LogTypeConsume || params.LogType == LogTypeRefund {
+		if eventKey == "" {
+			eventKey = log.RequestId
+		}
+		revenueQuota := int64(params.Quota)
+		if params.LogType == LogTypeRefund {
+			revenueQuota = -revenueQuota
+		}
+		RecordChannelProfit(eventKey, params.ChannelId, params.ModelName, revenueQuota, createdAt)
 	}
 	if params.LogType == LogTypeConsume && common.DataExportEnabled {
 		nodeName := params.NodeName

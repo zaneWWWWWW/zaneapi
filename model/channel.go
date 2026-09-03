@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"math"
 	"math/rand"
 	"strings"
 	"sync"
@@ -39,7 +40,10 @@ type Channel struct {
 	Models             string  `json:"models"`
 	Group              string  `json:"group" gorm:"type:varchar(64);default:'default'"`
 	UsedQuota          int64   `json:"used_quota" gorm:"bigint;default:0"`
-	ModelMapping       *string `json:"model_mapping" gorm:"type:text"`
+	// CostRatio is the upstream cost as a share of the final user charge.
+	// A nil value means the channel is not included in profit accounting.
+	CostRatio    *float64 `json:"cost_ratio"`
+	ModelMapping *string  `json:"model_mapping" gorm:"type:text"`
 	//MaxInputTokens     *int    `json:"max_input_tokens" gorm:"default:0"`
 	StatusCodeMapping *string `json:"status_code_mapping" gorm:"type:varchar(1024);default:''"`
 	Priority          *int64  `json:"priority" gorm:"bigint;default:0"`
@@ -67,6 +71,16 @@ type ChannelInfo struct {
 	MultiKeyDisabledTime   map[int]int64         `json:"multi_key_disabled_time,omitempty"`   // key禁用时间列表，key index -> time
 	MultiKeyPollingIndex   int                   `json:"multi_key_polling_index"`             // 多Key模式下轮询的key索引
 	MultiKeyMode           constant.MultiKeyMode `json:"multi_key_mode"`
+}
+
+func (channel *Channel) ValidateProfitSettings() error {
+	if channel.CostRatio == nil {
+		return nil
+	}
+	if math.IsNaN(*channel.CostRatio) || math.IsInf(*channel.CostRatio, 0) || *channel.CostRatio < 0 || *channel.CostRatio > 1 {
+		return errors.New("cost ratio must be between 0 and 1")
+	}
+	return nil
 }
 
 type ChannelSortOptions struct {

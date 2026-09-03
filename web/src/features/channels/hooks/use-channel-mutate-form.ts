@@ -25,6 +25,7 @@ import {
   ADMIN_PERMISSION_RESOURCES,
   hasPermission,
 } from '@/lib/admin-permissions'
+import { ROLE } from '@/lib/roles'
 import { useAuthStore } from '@/stores/auth-store'
 
 import { createChannel, updateChannel } from '../api'
@@ -53,6 +54,7 @@ const SENSITIVE_UPDATE_FIELDS = [
   'setting',
   'settings',
   'other',
+  'cost_ratio',
 ] satisfies (keyof Channel)[]
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -88,6 +90,7 @@ export function useChannelMutateForm(props: UseChannelMutateFormParams) {
     ADMIN_PERMISSION_RESOURCES.CHANNEL,
     ADMIN_PERMISSION_ACTIONS.SENSITIVE_WRITE
   )
+  const canEditProfitSettings = currentUser?.role === ROLE.SUPER_ADMIN
 
   return useMutation({
     mutationFn: async (data: ChannelFormValues): Promise<string> => {
@@ -103,6 +106,9 @@ export function useChannelMutateForm(props: UseChannelMutateFormParams) {
           for (const field of SENSITIVE_UPDATE_FIELDS) {
             delete payload[field]
           }
+        }
+        if (!canEditProfitSettings) {
+          delete payload.cost_ratio
         }
         const payloadWithKeyMode =
           canEditSensitive &&
@@ -126,6 +132,9 @@ export function useChannelMutateForm(props: UseChannelMutateFormParams) {
       }
 
       const payload = transformFormDataToCreatePayload(data)
+      if (!canEditProfitSettings) {
+        delete payload.channel.cost_ratio
+      }
       const response = await createChannel(payload)
       if (!response.success) {
         throw new Error(response.message || t(ERROR_MESSAGES.CREATE_FAILED))

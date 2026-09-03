@@ -32,6 +32,7 @@ import { ROLE } from '@/lib/roles'
 import { useAuthStore } from '@/stores/auth-store'
 
 import { getChannelOps } from './api'
+import { ChannelProfitSheet } from './components/channel-profit-sheet'
 import { ChannelsDialogs } from './components/channels-dialogs'
 import { ChannelsPrimaryButtons } from './components/channels-primary-buttons'
 import { ChannelsProvider } from './components/channels-provider'
@@ -94,6 +95,7 @@ export function Channels() {
           </span>
         </SectionPageLayout.Title>
         <SectionPageLayout.Actions>
+          {isRoot ? <ChannelProfitSheet /> : null}
           <ChannelsPrimaryButtons />
         </SectionPageLayout.Actions>
         <SectionPageLayout.Content>

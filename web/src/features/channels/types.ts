@@ -53,6 +53,7 @@ export const channelSchema = z.object({
   models: z.string().default(''),
   group: z.string().default('default'),
   used_quota: z.number().default(0),
+  cost_ratio: z.number().nullish(),
   model_mapping: z.string().nullish(),
   status_code_mapping: z.string().nullish(),
   priority: z.number().nullish(),
@@ -74,6 +75,23 @@ export const channelSchema = z.object({
 })
 
 export type Channel = z.infer<typeof channelSchema>
+
+export interface ChannelProfitSummary {
+  revenue_quota: number
+  cost_quota: number
+  profit_quota: number
+  request_count: number
+}
+
+export interface ChannelProfitByChannel extends ChannelProfitSummary {
+  channel_id: number
+  channel_name: string
+}
+
+export interface ChannelProfitReport extends ChannelProfitSummary {
+  channels: ChannelProfitByChannel[]
+  unconfigured_channel_count: number
+}
 
 // ============================================================================
 // Channel Settings Types

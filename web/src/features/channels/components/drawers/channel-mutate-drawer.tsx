@@ -612,6 +612,7 @@ export function ChannelMutateDrawer({
     ADMIN_PERMISSION_ACTIONS.SENSITIVE_WRITE
   )
   const canRevealChannelKey = currentUser?.role === ROLE.SUPER_ADMIN
+  const canEditProfitSettings = currentUser?.role === ROLE.SUPER_ADMIN
   const [fetchModelsDialogOpen, setFetchModelsDialogOpen] = useState(false)
   const [channelKey, setChannelKey] = useState<string | null>(null)
   const [isChannelKeyLoading, setIsChannelKeyLoading] = useState(false)
@@ -3674,6 +3675,42 @@ export function ChannelMutateDrawer({
                                   </FormItem>
                                 )}
                               />
+
+                              {canEditProfitSettings && (
+                                <FormField
+                                  control={form.control}
+                                  name='cost_ratio'
+                                  render={({ field }) => (
+                                    <FormItem>
+                                      <FormLabel>{t('Cost ratio')}</FormLabel>
+                                      <FormControl>
+                                        <Input
+                                          type='number'
+                                          min='0'
+                                          max='1'
+                                          step='0.01'
+                                          placeholder='0.72'
+                                          value={field.value ?? ''}
+                                          onChange={(event) => {
+                                            const value = event.target.value
+                                            field.onChange(
+                                              value === ''
+                                                ? null
+                                                : Number(value)
+                                            )
+                                          }}
+                                        />
+                                      </FormControl>
+                                      <FormDescription>
+                                        {t(
+                                          'Upstream cost share of final user charge. Use 0.72 for 72%.'
+                                        )}
+                                      </FormDescription>
+                                      <FormMessage />
+                                    </FormItem>
+                                  )}
+                                />
+                              )}
                             </div>
 
                             <FormField

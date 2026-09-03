@@ -26,6 +26,7 @@ import type {
   Channel,
   ChannelBalanceResponse,
   ChannelOpsResponse,
+  ChannelProfitReport,
   ChannelTestResponse,
   CopyChannelParams,
   CopyChannelResponse,
@@ -119,6 +120,14 @@ export async function getChannel(id: number): Promise<GetChannelResponse> {
  */
 export async function getChannelOps(): Promise<ChannelOpsResponse> {
   const res = await api.get('/api/channel/ops', channelActionConfig())
+  return res.data
+}
+
+export async function getChannelProfit(params: {
+  start_timestamp: number
+  end_timestamp: number
+}): Promise<{ success: boolean; data?: ChannelProfitReport }> {
+  const res = await api.get('/api/channel/profit', { params })
   return res.data
 }
 

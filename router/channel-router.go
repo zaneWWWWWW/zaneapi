@@ -27,6 +27,7 @@ func registerChannelRoutes(apiRouter *gin.RouterGroup) {
 		middleware.SecureVerificationRequired(),
 		controller.GetChannelKey,
 	)
+	channelRoute.GET("/profit", middleware.RootAuth(), controller.GetChannelProfit)
 
 	for _, route := range channelPermissionRoutes {
 		channelRoute.Handle(route.method, route.path,

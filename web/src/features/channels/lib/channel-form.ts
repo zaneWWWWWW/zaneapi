@@ -194,6 +194,7 @@ export const channelFormSchema = z
       .string()
       .max(255, 'Remark must be less than 255 characters')
       .optional(),
+    cost_ratio: z.number().min(0).max(1).nullable().optional(),
     setting: z
       .string()
       .optional()
@@ -361,6 +362,7 @@ export const CHANNEL_FORM_DEFAULT_VALUES: ChannelFormValues = {
   status_code_mapping: '',
   tag: '',
   remark: '',
+  cost_ratio: null,
   setting: '',
   param_override: '',
   header_override: '',
@@ -502,6 +504,7 @@ export function transformChannelToFormDefaults(
     status_code_mapping: channel.status_code_mapping || '',
     tag: channel.tag || '',
     remark: channel.remark || '',
+    cost_ratio: channel.cost_ratio ?? null,
     setting: channel.setting || '',
     param_override: channel.param_override || '',
     header_override: channel.header_override || '',
@@ -714,6 +717,7 @@ export function transformFormDataToCreatePayload(formData: ChannelFormValues): {
     status_code_mapping: formData.status_code_mapping || null,
     tag: formData.tag || null,
     remark: formData.remark || '',
+    cost_ratio: formData.cost_ratio,
     setting: buildSettingJSON(formData),
     param_override: formData.param_override || null,
     header_override: formData.header_override || null,
@@ -761,6 +765,7 @@ export function transformFormDataToUpdatePayload(
     status_code_mapping: formData.status_code_mapping || null,
     tag: formData.tag || null,
     remark: formData.remark || '',
+    cost_ratio: formData.cost_ratio,
     setting: buildSettingJSON(formData),
     param_override: formData.param_override || null,
     header_override: formData.header_override || null,
