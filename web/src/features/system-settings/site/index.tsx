@@ -26,7 +26,7 @@ import {
 
 const defaultSiteSettings: SiteSettings = {
   Notice: '',
-  SystemName: 'Macroapple',
+  SystemName: 'ZaneAPI',
   Logo: '',
   Footer: '',
   About: '',

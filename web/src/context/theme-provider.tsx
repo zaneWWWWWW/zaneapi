@@ -26,6 +26,8 @@ import {
 } from 'react'
 
 import { getCookie, setCookie, removeCookie } from '@/lib/cookies'
+import { applyFaviconToDom } from '@/lib/dom-utils'
+import { getLogo } from '@/stores/system-config-store'
 
 type Theme = 'dark' | 'light'
 type ResolvedTheme = Theme
@@ -84,6 +86,7 @@ export function ThemeProvider({
     root.classList.remove('light', 'dark')
     root.classList.add(theme)
     setResolvedTheme(theme)
+    applyFaviconToDom(getLogo())
   }, [theme])
 
   const setTheme = useCallback(

@@ -20,6 +20,7 @@ import { Link } from '@tanstack/react-router'
 import { Fragment, useMemo } from 'react'
 import { useTranslation } from 'react-i18next'
 
+import { BrandImage } from '@/components/brand-image'
 import { useStatus } from '@/hooks/use-status'
 import { useSystemConfig } from '@/hooks/use-system-config'
 import { parseHeaderNavModulesFromStatus } from '@/lib/nav-modules'
@@ -160,7 +161,7 @@ export function Footer(props: FooterProps) {
   } = useSystemConfig()
 
   const displayLogo = systemLogo || props.logo || '/logo.png'
-  const displayName = systemName || props.name || 'Macroapple'
+  const displayName = systemName || props.name || 'ZaneAPI'
   const isDemoSiteMode = Boolean(demoSiteEnabled)
   const currentYear = new Date().getFullYear()
 
@@ -211,14 +212,7 @@ export function Footer(props: FooterProps) {
       })
     }
     return columns
-  }, [
-    isDemoSiteMode,
-    showAbout,
-    showAgreement,
-    showDocs,
-    showPrivacy,
-    t,
-  ])
+  }, [isDemoSiteMode, showAbout, showAgreement, showDocs, showPrivacy, t])
 
   const displayColumns = props.columns ?? fallbackColumns
 
@@ -255,7 +249,7 @@ export function Footer(props: FooterProps) {
           {/* Brand column */}
           <div className='shrink-0'>
             <Link to='/' className='group flex items-center gap-2.5'>
-              <img
+              <BrandImage
                 src={displayLogo}
                 alt={displayName}
                 className='size-7 rounded-lg object-contain'

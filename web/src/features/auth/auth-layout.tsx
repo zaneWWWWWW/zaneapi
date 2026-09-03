@@ -19,6 +19,7 @@ For commercial licensing, please contact support@quantumnous.com
 import { Link } from '@tanstack/react-router'
 import { useTranslation } from 'react-i18next'
 
+import { BrandImage } from '@/components/brand-image'
 import { Skeleton } from '@/components/ui/skeleton'
 import { useSystemConfig } from '@/hooks/use-system-config'
 
@@ -41,7 +42,7 @@ export function AuthLayout({ children }: AuthLayoutProps) {
             {loading ? (
               <Skeleton className='absolute inset-0 rounded-md' />
             ) : (
-              <img
+              <BrandImage
                 src={logo}
                 alt={t('Logo')}
                 className='size-7 rounded-md object-cover'

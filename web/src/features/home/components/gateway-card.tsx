@@ -18,6 +18,8 @@ For commercial licensing, please contact support@quantumnous.com
 */
 import { useTranslation } from 'react-i18next'
 
+import { BrandImage } from '@/components/brand-image'
+
 import { getGatewayFeatures } from '../constants'
 
 interface GatewayCardProps {
@@ -35,7 +37,7 @@ export function GatewayCard({ logo, systemName }: GatewayCardProps) {
   return (
     <div className='border-border bg-card relative overflow-hidden rounded-lg border p-8 shadow-xs sm:p-10'>
       <div className='mb-8 flex items-center justify-center gap-3'>
-        <img
+        <BrandImage
           src={logo}
           alt={systemName}
           className='size-12 rounded-lg object-cover'

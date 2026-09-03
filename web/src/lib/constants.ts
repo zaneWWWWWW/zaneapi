@@ -21,8 +21,10 @@ For commercial licensing, please contact support@quantumnous.com
  */
 
 // System Configuration Defaults
-export const DEFAULT_SYSTEM_NAME = 'Macroapple'
-export const DEFAULT_LOGO = '/logo.png'
+export const DEFAULT_SYSTEM_NAME = 'ZaneAPI'
+export const DEFAULT_LOGO = '/brand/zaneapi-favicon-light.png'
+export const DEFAULT_FAVICON_LIGHT = '/brand/zaneapi-favicon-light.png'
+export const DEFAULT_FAVICON_DARK = '/brand/zaneapi-favicon-dark.png'
 
 // LocalStorage Keys
 export const STORAGE_KEYS = {

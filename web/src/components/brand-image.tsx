@@ -16,37 +16,21 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 For commercial licensing, please contact support@quantumnous.com
 */
-import { BrandImage } from '@/components/brand-image'
+import type { ImgHTMLAttributes } from 'react'
+
+import { DEFAULT_LOGO } from '@/lib/constants'
 import { cn } from '@/lib/utils'
 
-interface HeaderLogoProps {
-  src: string
-  alt?: string
-  loading: boolean
-  logoLoaded: boolean
-  className?: string
-}
-
 /**
- * Logo component for header with loading state
- * Shows image only when fully loaded for smooth UX
+ * Renders a system logo while keeping the bundled mark legible in dark mode.
+ * Custom administrator-provided logo URLs are left unchanged.
  */
-export function HeaderLogo({
-  src,
-  alt = 'logo',
-  loading,
-  logoLoaded,
-  className,
-}: HeaderLogoProps) {
+export function BrandImage(props: ImgHTMLAttributes<HTMLImageElement>) {
+  const { className, ...imageProps } = props
   return (
-    <BrandImage
-      src={src}
-      alt={alt}
-      className={cn(
-        'h-6 w-6 rounded-full transition-opacity duration-200',
-        !loading && logoLoaded ? 'opacity-100' : 'opacity-0',
-        className
-      )}
+    <img
+      {...imageProps}
+      className={cn(className, props.src === DEFAULT_LOGO && 'dark:invert')}
     />
   )
 }
