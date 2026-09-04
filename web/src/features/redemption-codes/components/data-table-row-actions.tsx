@@ -33,6 +33,12 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from '@/components/ui/tooltip'
+import {
+  ADMIN_PERMISSION_ACTIONS,
+  ADMIN_PERMISSION_RESOURCES,
+  hasPermission,
+} from '@/lib/admin-permissions'
+import { useAuthStore } from '@/stores/auth-store'
 
 import { updateRedemptionStatus } from '../api'
 import { REDEMPTION_STATUS, SUCCESS_MESSAGES } from '../constants'
@@ -50,6 +56,12 @@ export function DataTableRowActions<TData>({
   const { t } = useTranslation()
   const redemption = redemptionSchema.parse(row.original)
   const { setOpen, setCurrentRow, triggerRefresh } = useRedemptions()
+  const currentUser = useAuthStore((s) => s.auth.user)
+  const canWrite = hasPermission(
+    currentUser,
+    ADMIN_PERMISSION_RESOURCES.REDEMPTION,
+    ADMIN_PERMISSION_ACTIONS.WRITE
+  )
   const isEnabled = redemption.status === REDEMPTION_STATUS.ENABLED
   const isUsed = redemption.status === REDEMPTION_STATUS.USED
   const isExpired = isRedemptionExpired(
@@ -58,6 +70,7 @@ export function DataTableRowActions<TData>({
   )
 
   const handleToggleStatus = async () => {
+    if (!canWrite) return
     const newStatus = isEnabled
       ? REDEMPTION_STATUS.DISABLED
       : REDEMPTION_STATUS.ENABLED
@@ -72,8 +85,12 @@ export function DataTableRowActions<TData>({
     }
   }
 
-  const canEdit = isEnabled && !isExpired
-  const canToggle = !isUsed && !isExpired
+  const canEdit = canWrite && isEnabled && !isExpired
+  const canToggle = canWrite && !isUsed && !isExpired
+
+  if (!canWrite) {
+    return null
+  }
 
   return (
     <div className='-ml-1.5 flex items-center gap-1'>

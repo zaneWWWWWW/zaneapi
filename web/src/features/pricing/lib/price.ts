@@ -114,6 +114,13 @@ export function formatSquareGroupRatio(ratio: number): string {
   return Number(ratio.toPrecision(6)).toString()
 }
 
+export function formatSquareGroupPriceLabel(
+  own: string,
+  groupRatio: number
+): string {
+  return `${own}×${formatSquareGroupRatio(groupRatio)}`
+}
+
 function formatTokenAmount(
   priceInUSD: number,
   tokenUnit: TokenUnit,

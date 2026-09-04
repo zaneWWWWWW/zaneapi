@@ -25,7 +25,11 @@ import {
   MODELS_SECTION_IDS,
   MODELS_DEFAULT_SECTION,
 } from '@/features/models/section-registry'
-import { ROLE } from '@/lib/roles'
+import {
+  ADMIN_PERMISSION_ACTIONS,
+  ADMIN_PERMISSION_RESOURCES,
+  hasPermission,
+} from '@/lib/admin-permissions'
 import { useAuthStore } from '@/stores/auth-store'
 
 const modelsSearchSchema = z.object({
@@ -46,7 +50,13 @@ export const Route = createFileRoute('/_authenticated/models/$section')({
   beforeLoad: ({ params }) => {
     const { auth } = useAuthStore.getState()
 
-    if (!auth.user || auth.user.role < ROLE.ADMIN) {
+    if (
+      !hasPermission(
+        auth.user,
+        ADMIN_PERMISSION_RESOURCES.MODELS,
+        ADMIN_PERMISSION_ACTIONS.READ
+      )
+    ) {
       throw redirect({
         to: '/403',
       })

@@ -20,17 +20,31 @@ import { Plus } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 
 import { Button } from '@/components/ui/button'
+import {
+  ADMIN_PERMISSION_ACTIONS,
+  ADMIN_PERMISSION_RESOURCES,
+  hasPermission,
+} from '@/lib/admin-permissions'
+import { useAuthStore } from '@/stores/auth-store'
 
 import { useUsers } from './users-provider'
 
 export function UsersPrimaryButtons() {
   const { t } = useTranslation()
   const { setOpen, setCurrentRow } = useUsers()
+  const currentUser = useAuthStore((s) => s.auth.user)
+  const canWrite = hasPermission(
+    currentUser,
+    ADMIN_PERMISSION_RESOURCES.USERS,
+    ADMIN_PERMISSION_ACTIONS.WRITE
+  )
 
   const handleCreate = () => {
     setCurrentRow(null)
     setOpen('create')
   }
+
+  if (!canWrite) return null
 
   return (
     <div className='flex gap-2'>

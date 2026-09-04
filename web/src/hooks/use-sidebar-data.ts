@@ -37,6 +37,10 @@ import { useTranslation } from 'react-i18next'
 import { getSystemSettingsNavItems } from '@/components/layout/config/system-settings.config'
 import type { NavItem, SidebarData } from '@/components/layout/types'
 import { useStatus } from '@/hooks/use-status'
+import {
+  ADMIN_PERMISSION_ACTIONS,
+  ADMIN_PERMISSION_RESOURCES,
+} from '@/lib/admin-permissions'
 import { parseHeaderNavModulesFromStatus } from '@/lib/nav-modules'
 
 /**
@@ -140,27 +144,47 @@ export function useSidebarData(): SidebarData {
           title: t('Channels'),
           url: '/channels',
           icon: Radio,
+          requiredPermission: {
+            resource: ADMIN_PERMISSION_RESOURCES.CHANNEL,
+            action: ADMIN_PERMISSION_ACTIONS.READ,
+          },
         },
         {
           title: t('Models'),
           url: '/models/metadata',
           icon: Box,
           activeUrls: ['/models/deployments'],
+          requiredPermission: {
+            resource: ADMIN_PERMISSION_RESOURCES.MODELS,
+            action: ADMIN_PERMISSION_ACTIONS.READ,
+          },
         },
         {
           title: t('Users'),
           url: '/users',
           icon: Users,
+          requiredPermission: {
+            resource: ADMIN_PERMISSION_RESOURCES.USERS,
+            action: ADMIN_PERMISSION_ACTIONS.READ,
+          },
         },
         {
           title: t('Redemption Codes'),
           url: '/redemption-codes',
           icon: Ticket,
+          requiredPermission: {
+            resource: ADMIN_PERMISSION_RESOURCES.REDEMPTION,
+            action: ADMIN_PERMISSION_ACTIONS.READ,
+          },
         },
         {
           title: t('Subscriptions'),
           url: '/subscriptions',
           icon: CreditCard,
+          requiredPermission: {
+            resource: ADMIN_PERMISSION_RESOURCES.SUBSCRIPTIONS,
+            action: ADMIN_PERMISSION_ACTIONS.READ,
+          },
         },
       ],
     })

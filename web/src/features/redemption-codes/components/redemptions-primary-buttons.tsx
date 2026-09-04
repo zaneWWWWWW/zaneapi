@@ -23,6 +23,12 @@ import { toast } from 'sonner'
 
 import { ConfirmDialog } from '@/components/confirm-dialog'
 import { Button } from '@/components/ui/button'
+import {
+  ADMIN_PERMISSION_ACTIONS,
+  ADMIN_PERMISSION_RESOURCES,
+  hasPermission,
+} from '@/lib/admin-permissions'
+import { useAuthStore } from '@/stores/auth-store'
 
 import { deleteInvalidRedemptions } from '../api'
 import { ERROR_MESSAGES } from '../constants'
@@ -31,6 +37,12 @@ import { useRedemptions } from './redemptions-provider'
 export function RedemptionsPrimaryButtons() {
   const { t } = useTranslation()
   const { setOpen, triggerRefresh } = useRedemptions()
+  const currentUser = useAuthStore((s) => s.auth.user)
+  const canWrite = hasPermission(
+    currentUser,
+    ADMIN_PERMISSION_RESOURCES.REDEMPTION,
+    ADMIN_PERMISSION_ACTIONS.WRITE
+  )
   const [showDeleteInvalidConfirm, setShowDeleteInvalidConfirm] =
     useState(false)
   const [isDeleting, setIsDeleting] = useState(false)
@@ -55,6 +67,8 @@ export function RedemptionsPrimaryButtons() {
       setIsDeleting(false)
     }
   }
+
+  if (!canWrite) return null
 
   return (
     <>

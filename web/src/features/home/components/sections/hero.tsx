@@ -44,7 +44,7 @@ export function Hero(props: HeroProps) {
     !status?.self_use_mode_enabled && status?.register_enabled !== false
 
   return (
-    <section className='relative z-10 overflow-hidden px-6 pt-8 pb-16 md:pt-12 md:pb-24 lg:pt-16 lg:pb-28'>
+    <section className='relative z-10 overflow-hidden px-6 pt-8 pb-12 md:pt-12 md:pb-16 lg:pt-16 lg:pb-20'>
       <div className='mx-auto grid max-w-6xl grid-cols-1 items-start gap-12 lg:grid-cols-12 lg:gap-8'>
         {/* Left Column: Title, description, action buttons and application support */}
         <div className='flex flex-col items-start text-left lg:col-span-6'>
@@ -104,7 +104,7 @@ export function Hero(props: HeroProps) {
             style={{ animationDelay: '240ms' }}
           >
             <div className='mb-4 flex flex-col gap-1'>
-              <span className='text-muted-foreground/50 text-[10px] font-bold tracking-[0.15em] uppercase'>
+              <span className='text-muted-foreground text-xs font-medium'>
                 {t('What you can call')}
               </span>
               <p className='text-muted-foreground/60 text-xs leading-relaxed'>

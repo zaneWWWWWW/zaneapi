@@ -89,6 +89,16 @@ export function ChannelsPrimaryButtons() {
     ADMIN_PERMISSION_RESOURCES.CHANNEL,
     ADMIN_PERMISSION_ACTIONS.SENSITIVE_WRITE
   )
+  const canOperate = hasPermission(
+    currentUser,
+    ADMIN_PERMISSION_RESOURCES.CHANNEL,
+    ADMIN_PERMISSION_ACTIONS.OPERATE
+  )
+  const canWrite = hasPermission(
+    currentUser,
+    ADMIN_PERMISSION_RESOURCES.CHANNEL,
+    ADMIN_PERMISSION_ACTIONS.WRITE
+  )
 
   const handleTagModeToggle = (checked: boolean) => {
     localStorage.setItem('enable-tag-mode', String(checked))
@@ -208,7 +218,9 @@ export function ChannelsPrimaryButtons() {
             <DropdownMenuSeparator className='sm:hidden' />
 
             <DropdownMenuItem
+              disabled={!canOperate}
               onClick={() => {
+                if (!canOperate) return
                 handleTestAllChannels(queryClient)
               }}
             >
@@ -219,7 +231,9 @@ export function ChannelsPrimaryButtons() {
             </DropdownMenuItem>
 
             <DropdownMenuItem
+              disabled={!canOperate}
               onClick={() => {
+                if (!canOperate) return
                 handleUpdateAllBalances(queryClient)
               }}
             >
@@ -232,8 +246,11 @@ export function ChannelsPrimaryButtons() {
             <DropdownMenuSeparator />
 
             <DropdownMenuItem
-              onClick={() => upstream.detectAllUpdates()}
-              disabled={upstream.detectAllLoading}
+              onClick={() => {
+                if (!canOperate) return
+                void upstream.detectAllUpdates()
+              }}
+              disabled={!canOperate || upstream.detectAllLoading}
             >
               {t('Detect All Upstream Updates')}
               <DropdownMenuShortcut>
@@ -242,8 +259,11 @@ export function ChannelsPrimaryButtons() {
             </DropdownMenuItem>
 
             <DropdownMenuItem
-              onClick={() => upstream.applyAllUpdates()}
-              disabled={upstream.applyAllLoading}
+              onClick={() => {
+                if (!canWrite) return
+                void upstream.applyAllUpdates()
+              }}
+              disabled={!canWrite || upstream.applyAllLoading}
             >
               {t('Apply All Upstream Updates')}
               <DropdownMenuShortcut>
@@ -254,8 +274,10 @@ export function ChannelsPrimaryButtons() {
             <DropdownMenuSeparator />
 
             <DropdownMenuItem
+              disabled={!canOperate}
               onSelect={(e) => {
                 e.preventDefault()
+                if (!canOperate) return
                 setShowConsistencyDialog(true)
               }}
             >
@@ -313,6 +335,7 @@ export function ChannelsPrimaryButtons() {
         confirmText={t('Repair')}
         isLoading={isRepairingConsistency}
         handleConfirm={async () => {
+          if (!canOperate) return
           setIsRepairingConsistency(true)
           try {
             await handleFixAbilities(queryClient, (_result) => {

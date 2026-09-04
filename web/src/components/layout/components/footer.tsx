@@ -225,7 +225,7 @@ export function Footer(props: FooterProps) {
         )}
       >
         <div className='mx-auto w-full max-w-6xl px-6 py-5'>
-          <div className='bg-muted/20 border-border/50 flex flex-col items-center justify-between gap-4 rounded-2xl border px-4 py-4 backdrop-blur-sm sm:flex-row sm:px-5'>
+          <div className='bg-muted/20 border-border/50 flex flex-col items-center justify-between gap-4 rounded-lg border px-4 py-4 sm:flex-row sm:px-5'>
             <div
               className='custom-footer text-muted-foreground min-w-0 text-center text-sm sm:text-left'
               dangerouslySetInnerHTML={{ __html: footerHtml }}
@@ -273,7 +273,7 @@ export function Footer(props: FooterProps) {
           >
             {displayColumns.map((column) => (
               <div key={column.title}>
-                <p className='text-muted-foreground/50 mb-3 text-xs font-medium tracking-wider uppercase'>
+                <p className='text-muted-foreground mb-3 text-xs font-medium'>
                   {t(column.title)}
                 </p>
                 <ul className='space-y-2.5'>

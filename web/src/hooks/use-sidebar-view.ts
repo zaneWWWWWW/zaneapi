@@ -22,6 +22,7 @@ import { useTranslation } from 'react-i18next'
 
 import { resolveSidebarView } from '@/components/layout/lib/sidebar-view-registry'
 import type { NavGroup, ResolvedSidebarView } from '@/components/layout/types'
+import { hasPermission } from '@/lib/admin-permissions'
 import { ROLE } from '@/lib/roles'
 import { useAuthStore } from '@/stores/auth-store'
 
@@ -47,32 +48,60 @@ const ROOT_VIEW_KEY = '__root'
 export function useSidebarView(): ResolvedSidebarView {
   const { t } = useTranslation()
   const pathname = useLocation({ select: (l) => l.pathname })
-  const userRole = useAuthStore((s) => s.auth.user?.role)
+  const user = useAuthStore((s) => s.auth.user)
+  const userRole = user?.role
   const rootSidebarData = useSidebarData()
   const configFilteredRoot = useSidebarConfig(rootSidebarData.navGroups)
 
   const rootNavGroups = useMemo<NavGroup[]>(() => {
     const role = userRole ?? ROLE.GUEST
     const isAdmin = role >= ROLE.ADMIN
+    const isSuperAdmin = role >= ROLE.SUPER_ADMIN
     return configFilteredRoot
-      .filter((group) =>
-        group.id === 'admin' || group.id === 'system-settings' ? isAdmin : true
-      )
+      .filter((group) => {
+        if (group.id === 'admin') return isAdmin
+        if (group.id === 'system-settings') return isSuperAdmin
+        return true
+      })
       .map((group) => {
         const items = group.items
           .map((item) => {
             if (!('items' in item) || !item.items) return item
-            const nested = item.items.filter(
-              (subItem) =>
-                subItem.requiredRole === undefined ||
-                role >= subItem.requiredRole
-            )
+            const nested = item.items.filter((subItem) => {
+              if (
+                subItem.requiredRole !== undefined &&
+                role < subItem.requiredRole
+              ) {
+                return false
+              }
+              if (
+                subItem.requiredPermission &&
+                !hasPermission(
+                  user,
+                  subItem.requiredPermission.resource,
+                  subItem.requiredPermission.action
+                )
+              ) {
+                return false
+              }
+              return true
+            })
             return nested.length === item.items.length
               ? item
               : { ...item, items: nested }
           })
           .filter((item) => {
             if (item.requiredRole !== undefined && role < item.requiredRole) {
+              return false
+            }
+            if (
+              item.requiredPermission &&
+              !hasPermission(
+                user,
+                item.requiredPermission.resource,
+                item.requiredPermission.action
+              )
+            ) {
               return false
             }
             if ('items' in item && item.items && item.items.length === 0) {
@@ -82,7 +111,7 @@ export function useSidebarView(): ResolvedSidebarView {
           })
         return items.length === group.items.length ? group : { ...group, items }
       })
-  }, [configFilteredRoot, userRole])
+  }, [configFilteredRoot, user, userRole])
 
   const view = resolveSidebarView(pathname)
 

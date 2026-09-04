@@ -25,7 +25,8 @@ import type { HomePageGroupRatio } from '../../types'
 
 function formatGroupRatio(ratio: number): string {
   if (!Number.isFinite(ratio)) return '-'
-  const text = ratio % 1 === 0 ? String(ratio) : ratio.toFixed(4).replace(/\.?0+$/, '')
+  const text =
+    ratio % 1 === 0 ? String(ratio) : ratio.toFixed(4).replace(/\.?0+$/, '')
   return `${text}x`
 }
 
@@ -109,7 +110,7 @@ export function GroupRatioMarquee() {
       aria-label={t('Site group ratios')}
     >
       <div className='mx-auto max-w-6xl'>
-        <p className='text-muted-foreground mb-2 text-[11px] font-medium tracking-wide uppercase'>
+        <p className='text-muted-foreground mb-2 text-xs font-medium'>
           {t('Site group ratios')}
         </p>
         <ul className='sr-only'>

@@ -35,12 +35,24 @@ import {
   DropdownMenuShortcut,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
+import {
+  ADMIN_PERMISSION_ACTIONS,
+  ADMIN_PERMISSION_RESOURCES,
+  hasPermission,
+} from '@/lib/admin-permissions'
+import { useAuthStore } from '@/stores/auth-store'
 
 import { useModels } from './models-provider'
 
 export function ModelsPrimaryButtons() {
   const { t } = useTranslation()
   const { setOpen, setCurrentRow } = useModels()
+  const currentUser = useAuthStore((s) => s.auth.user)
+  const canWrite = hasPermission(
+    currentUser,
+    ADMIN_PERMISSION_RESOURCES.MODELS,
+    ADMIN_PERMISSION_ACTIONS.WRITE
+  )
 
   const handleCreateModel = () => {
     setCurrentRow(null)
@@ -65,13 +77,13 @@ export function ModelsPrimaryButtons() {
 
   return (
     <div className='flex items-center gap-2'>
-      {/* Create Model */}
-      <Button onClick={handleCreateModel} size='sm'>
-        <Plus className='h-4 w-4' />
-        {t('Add Model')}
-      </Button>
+      {canWrite ? (
+        <Button onClick={handleCreateModel} size='sm'>
+          <Plus className='h-4 w-4' />
+          {t('Add Model')}
+        </Button>
+      ) : null}
 
-      {/* More Actions */}
       <DropdownMenu>
         <DropdownMenuTrigger render={<Button variant='outline' size='sm' />}>
           <MoreHorizontal className='h-4 w-4' />
@@ -84,28 +96,34 @@ export function ModelsPrimaryButtons() {
             </DropdownMenuShortcut>
           </DropdownMenuItem>
 
-          <DropdownMenuItem onClick={handleSync}>
-            {t('Sync Upstream')}
-            <DropdownMenuShortcut>
-              <RefreshCw className='h-4 w-4' />
-            </DropdownMenuShortcut>
-          </DropdownMenuItem>
+          {canWrite ? (
+            <DropdownMenuItem onClick={handleSync}>
+              {t('Sync Upstream')}
+              <DropdownMenuShortcut>
+                <RefreshCw className='h-4 w-4' />
+              </DropdownMenuShortcut>
+            </DropdownMenuItem>
+          ) : null}
 
-          <DropdownMenuSeparator />
+          {canWrite ? <DropdownMenuSeparator /> : null}
 
-          <DropdownMenuItem onClick={handlePrefillGroups}>
-            {t('Prefill Groups')}
-            <DropdownMenuShortcut>
-              <List className='h-4 w-4' />
-            </DropdownMenuShortcut>
-          </DropdownMenuItem>
+          {canWrite ? (
+            <DropdownMenuItem onClick={handlePrefillGroups}>
+              {t('Prefill Groups')}
+              <DropdownMenuShortcut>
+                <List className='h-4 w-4' />
+              </DropdownMenuShortcut>
+            </DropdownMenuItem>
+          ) : null}
 
-          <DropdownMenuItem onClick={handleManageVendors}>
-            {t('Manage Vendors')}
-            <DropdownMenuShortcut>
-              <Building2 className='h-4 w-4' />
-            </DropdownMenuShortcut>
-          </DropdownMenuItem>
+          {canWrite ? (
+            <DropdownMenuItem onClick={handleManageVendors}>
+              {t('Manage Vendors')}
+              <DropdownMenuShortcut>
+                <Building2 className='h-4 w-4' />
+              </DropdownMenuShortcut>
+            </DropdownMenuItem>
+          ) : null}
         </DropdownMenuContent>
       </DropdownMenu>
     </div>

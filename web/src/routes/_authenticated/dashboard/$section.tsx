@@ -23,6 +23,12 @@ import {
   DASHBOARD_SECTION_IDS,
   DASHBOARD_DEFAULT_SECTION,
 } from '@/features/dashboard/section-registry'
+import {
+  ADMIN_PERMISSION_ACTIONS,
+  ADMIN_PERMISSION_RESOURCES,
+  hasPermission,
+} from '@/lib/admin-permissions'
+import { useAuthStore } from '@/stores/auth-store'
 
 export const Route = createFileRoute('/_authenticated/dashboard/$section')({
   beforeLoad: ({ params }) => {
@@ -32,6 +38,21 @@ export const Route = createFileRoute('/_authenticated/dashboard/$section')({
         to: '/dashboard/$section',
         params: { section: DASHBOARD_DEFAULT_SECTION },
       })
+    }
+    if (params.section === 'users') {
+      const { auth } = useAuthStore.getState()
+      if (
+        !hasPermission(
+          auth.user,
+          ADMIN_PERMISSION_RESOURCES.DASHBOARD,
+          ADMIN_PERMISSION_ACTIONS.READ
+        )
+      ) {
+        throw redirect({
+          to: '/dashboard/$section',
+          params: { section: DASHBOARD_DEFAULT_SECTION },
+        })
+      }
     }
   },
   component: Dashboard,

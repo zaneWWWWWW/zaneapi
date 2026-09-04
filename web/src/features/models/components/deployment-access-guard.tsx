@@ -59,7 +59,7 @@ interface DeploymentAccessGuardProps {
   connectionOk: boolean | null
   connectionError: string | null
   onRetry: () => void
-  onOpenSettings: () => void
+  onOpenSettings?: () => void
 }
 
 function LoadingStep({
@@ -151,10 +151,12 @@ export function DeploymentAccessGuard({
               )}
             </AlertDescription>
           </Alert>
-          <Button onClick={onOpenSettings} className='w-full'>
-            <Settings className='mr-2 h-4 w-4' />
-            {t('Go to settings')}
-          </Button>
+          {onOpenSettings ? (
+            <Button onClick={onOpenSettings} className='w-full'>
+              <Settings className='mr-2 h-4 w-4' />
+              {t('Go to settings')}
+            </Button>
+          ) : null}
         </div>
       </div>
     )
@@ -182,10 +184,12 @@ export function DeploymentAccessGuard({
             <Button variant='outline' onClick={onRetry} className='flex-1'>
               {t('Retry')}
             </Button>
-            <Button onClick={onOpenSettings} className='flex-1'>
-              <Settings className='mr-2 h-4 w-4' />
-              {t('Go to settings')}
-            </Button>
+            {onOpenSettings ? (
+              <Button onClick={onOpenSettings} className='flex-1'>
+                <Settings className='mr-2 h-4 w-4' />
+                {t('Go to settings')}
+              </Button>
+            ) : null}
           </div>
         </div>
       </div>

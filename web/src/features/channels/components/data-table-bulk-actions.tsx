@@ -17,7 +17,7 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 For commercial licensing, please contact support@quantumnous.com
 */
 import { useQueryClient } from '@tanstack/react-query'
-import { type Table } from '@tanstack/react-table'
+import type { Table } from '@tanstack/react-table'
 import { Power, PowerOff, Tag, Trash2 } from 'lucide-react'
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
@@ -61,6 +61,16 @@ export function DataTableBulkActions<TData>({
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
   const [tagValue, setTagValue] = useState('')
   const currentUser = useAuthStore((s) => s.auth.user)
+  const canOperate = hasPermission(
+    currentUser,
+    ADMIN_PERMISSION_RESOURCES.CHANNEL,
+    ADMIN_PERMISSION_ACTIONS.OPERATE
+  )
+  const canWrite = hasPermission(
+    currentUser,
+    ADMIN_PERMISSION_RESOURCES.CHANNEL,
+    ADMIN_PERMISSION_ACTIONS.WRITE
+  )
   const canEditSensitive = hasPermission(
     currentUser,
     ADMIN_PERMISSION_RESOURCES.CHANNEL,
@@ -83,10 +93,12 @@ export function DataTableBulkActions<TData>({
   }
 
   const handleEnableAll = () => {
+    if (!canOperate) return
     handleBatchEnable(selectedIds, queryClient, handleClearSelection)
   }
 
   const handleDisableAll = () => {
+    if (!canOperate) return
     handleBatchDisable(selectedIds, queryClient, handleClearSelection)
   }
 
@@ -99,6 +111,7 @@ export function DataTableBulkActions<TData>({
   }
 
   const handleSetTag = () => {
+    if (!canWrite) return
     handleBatchSetTag(selectedIds, tagValue || null, queryClient, () => {
       setShowTagDialog(false)
       setTagValue('')
@@ -116,9 +129,14 @@ export function DataTableBulkActions<TData>({
                 variant='outline'
                 size='icon'
                 onClick={handleEnableAll}
+                disabled={!canOperate}
                 className='size-8'
                 aria-label={t('Enable selected channels')}
-                title={t('Enable selected channels')}
+                title={
+                  canOperate
+                    ? t('Enable selected channels')
+                    : t('No permission to perform this action')
+                }
               />
             }
           >
@@ -126,7 +144,11 @@ export function DataTableBulkActions<TData>({
             <span className='sr-only'>{t('Enable selected channels')}</span>
           </TooltipTrigger>
           <TooltipContent>
-            <p>{t('Enable selected channels')}</p>
+            <p>
+              {canOperate
+                ? t('Enable selected channels')
+                : t('No permission to perform this action')}
+            </p>
           </TooltipContent>
         </Tooltip>
 
@@ -137,9 +159,14 @@ export function DataTableBulkActions<TData>({
                 variant='outline'
                 size='icon'
                 onClick={handleDisableAll}
+                disabled={!canOperate}
                 className='size-8'
                 aria-label={t('Disable selected channels')}
-                title={t('Disable selected channels')}
+                title={
+                  canOperate
+                    ? t('Disable selected channels')
+                    : t('No permission to perform this action')
+                }
               />
             }
           >
@@ -147,7 +174,11 @@ export function DataTableBulkActions<TData>({
             <span className='sr-only'>{t('Disable selected channels')}</span>
           </TooltipTrigger>
           <TooltipContent>
-            <p>{t('Disable selected channels')}</p>
+            <p>
+              {canOperate
+                ? t('Disable selected channels')
+                : t('No permission to perform this action')}
+            </p>
           </TooltipContent>
         </Tooltip>
 
@@ -157,10 +188,18 @@ export function DataTableBulkActions<TData>({
               <Button
                 variant='outline'
                 size='icon'
-                onClick={() => setShowTagDialog(true)}
+                onClick={() => {
+                  if (!canWrite) return
+                  setShowTagDialog(true)
+                }}
+                disabled={!canWrite}
                 className='size-8'
                 aria-label={t('Set tag for selected channels')}
-                title={t('Set tag for selected channels')}
+                title={
+                  canWrite
+                    ? t('Set tag for selected channels')
+                    : t('No permission to perform this action')
+                }
               />
             }
           >
@@ -170,7 +209,11 @@ export function DataTableBulkActions<TData>({
             </span>
           </TooltipTrigger>
           <TooltipContent>
-            <p>{t('Set tag for selected channels')}</p>
+            <p>
+              {canWrite
+                ? t('Set tag for selected channels')
+                : t('No permission to perform this action')}
+            </p>
           </TooltipContent>
         </Tooltip>
 
@@ -236,7 +279,9 @@ export function DataTableBulkActions<TData>({
             >
               {t('Cancel')}
             </Button>
-            <Button onClick={handleSetTag}>{t('Set Tag')}</Button>
+            <Button onClick={handleSetTag} disabled={!canWrite}>
+              {t('Set Tag')}
+            </Button>
           </>
         }
       >

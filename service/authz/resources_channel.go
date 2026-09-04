@@ -33,13 +33,11 @@ func init() {
 				Action:         ActionOperate,
 				LabelKey:       "Operate channels",
 				DescriptionKey: "Test channels, refresh balances, and enable/disable individual, batch, or tagged channels.",
-				DefaultRoles:   []string{BuiltInRoleAdmin},
 			},
 			{
 				Action:         ActionWrite,
 				LabelKey:       "Edit channel routing",
 				DescriptionKey: "Edit non-sensitive settings such as models, groups, and routing rules.",
-				DefaultRoles:   []string{BuiltInRoleAdmin},
 			},
 			{
 				Action:         ActionSensitiveWrite,

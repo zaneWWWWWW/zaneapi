@@ -25,6 +25,12 @@ export type AdminCapabilities = AdminPermissionMatrix
 
 export const ADMIN_PERMISSION_RESOURCES = {
   CHANNEL: 'channel',
+  MODELS: 'models',
+  USERS: 'users',
+  REDEMPTION: 'redemption',
+  SUBSCRIPTIONS: 'subscriptions',
+  LOGS: 'logs',
+  DASHBOARD: 'dashboard',
 } as const
 
 export const ADMIN_PERMISSION_ACTIONS = {
@@ -34,6 +40,35 @@ export const ADMIN_PERMISSION_ACTIONS = {
   SENSITIVE_WRITE: 'sensitive_write',
   SECRET_VIEW: 'secret_view',
 } as const
+
+export type AdminPermissionPreset = 'readonly' | 'operational'
+
+function isOperationalAction(action: string): boolean {
+  return (
+    action === ADMIN_PERMISSION_ACTIONS.READ ||
+    action === ADMIN_PERMISSION_ACTIONS.OPERATE ||
+    action === ADMIN_PERMISSION_ACTIONS.WRITE
+  )
+}
+
+export function applyAdminPermissionPreset(
+  catalog: PermissionCatalog,
+  preset: AdminPermissionPreset
+): AdminPermissionMatrix {
+  const normalized: AdminPermissionMatrix = {}
+  for (const resource of catalog.resources) {
+    const actions: Record<string, boolean> = {}
+    for (const action of resource.actions) {
+      if (preset === 'readonly') {
+        actions[action.action] = action.action === ADMIN_PERMISSION_ACTIONS.READ
+      } else {
+        actions[action.action] = isOperationalAction(action.action)
+      }
+    }
+    normalized[resource.resource] = actions
+  }
+  return normalized
+}
 
 // The role whose baseline grants are used as defaults in the permission editor.
 export const ADMIN_ROLE_KEY = 'admin'

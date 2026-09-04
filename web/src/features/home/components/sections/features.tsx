@@ -93,9 +93,7 @@ export function Features(_props: FeaturesProps) {
       id: 'billing',
       num: '03',
       title: t('Usage and billing in one place'),
-      desc: t(
-        'See cost and traffic for every chat, image, and video request.'
-      ),
+      desc: t('See cost and traffic for every chat, image, and video request.'),
       span: 'md:col-span-1',
       visual: (
         <div className='mt-4 space-y-2'>
@@ -150,7 +148,7 @@ export function Features(_props: FeaturesProps) {
   ]
 
   return (
-    <section className='relative z-10 px-6 py-24 md:py-32'>
+    <section className='relative z-10 px-6 py-12 md:py-16'>
       <div className='mx-auto max-w-6xl'>
         <AnimateInView className='mb-10 max-w-lg md:mb-12'>
           <p className='text-muted-foreground mb-3 text-xs font-medium'>

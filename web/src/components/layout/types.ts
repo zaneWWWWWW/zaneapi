@@ -34,6 +34,13 @@ type BaseNavItem = {
    * `useSidebarView`). Route-level guards still enforce access independently.
    */
   requiredRole?: number
+  /**
+   * Extra admin capability required to see this item. Super admins always pass.
+   */
+  requiredPermission?: {
+    resource: string
+    action: string
+  }
 }
 
 /**

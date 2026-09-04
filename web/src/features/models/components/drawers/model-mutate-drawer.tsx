@@ -80,6 +80,8 @@ import { useUpdateOption } from '@/features/system-settings/hooks/use-update-opt
 import { normalizeJsonString } from '@/features/system-settings/models/utils'
 import type { ModelSettings } from '@/features/system-settings/types'
 import { safeJsonParse } from '@/features/system-settings/utils/json-parser'
+import { ROLE } from '@/lib/roles'
+import { useAuthStore } from '@/stores/auth-store'
 
 import { createModel, updateModel, getModel, getVendors } from '../../api'
 import { getNameRuleOptions, ENDPOINT_TEMPLATES } from '../../constants'
@@ -125,6 +127,9 @@ export function ModelMutateDrawer({
 }: ModelMutateDrawerProps) {
   const { t } = useTranslation()
   const queryClient = useQueryClient()
+  const isRoot = useAuthStore(
+    (state) => state.auth.user?.role === ROLE.SUPER_ADMIN
+  )
   const currentModelId = currentRow?.id
   const isEditing = Boolean(currentModelId)
   const [isSubmitting, setIsSubmitting] = useState(false)
@@ -156,8 +161,10 @@ export function ModelMutateDrawer({
     enabled: open && isEditing,
   })
 
-  // Fetch system options for ratio configuration
-  const { data: systemOptionsData } = useSystemOptions()
+  // System-wide ratio maps are root-only (`GET /api/option/`).
+  const { data: systemOptionsData } = useSystemOptions({
+    enabled: open && isRoot,
+  })
 
   const updateOption = useUpdateOption()
 

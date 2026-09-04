@@ -71,7 +71,7 @@ export function ApiAccessUrls() {
       <div className='mb-2 flex flex-col gap-0.5 sm:flex-row sm:items-baseline sm:justify-between sm:gap-3'>
         <h3 className='text-sm font-medium'>{t('API endpoints')}</h3>
         <p className='text-muted-foreground text-xs'>
-          {t('Use the Cloudflare URL if you are in mainland China.')}
+          {t('Choose an access URL based on your network or needs.')}
         </p>
       </div>
       <ul

@@ -26,6 +26,12 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from '@/components/ui/tooltip'
+import {
+  ADMIN_PERMISSION_ACTIONS,
+  ADMIN_PERMISSION_RESOURCES,
+  hasPermission,
+} from '@/lib/admin-permissions'
+import { useAuthStore } from '@/stores/auth-store'
 
 import type { PlanRecord } from '../types'
 import { useSubscriptions } from './subscriptions-provider'
@@ -37,22 +43,36 @@ interface DataTableRowActionsProps {
 export function DataTableRowActions({ row }: DataTableRowActionsProps) {
   const { t } = useTranslation()
   const { setOpen, setCurrentRow, complianceConfirmed } = useSubscriptions()
+  const currentUser = useAuthStore((s) => s.auth.user)
+  const canWrite = hasPermission(
+    currentUser,
+    ADMIN_PERMISSION_RESOURCES.SUBSCRIPTIONS,
+    ADMIN_PERMISSION_ACTIONS.WRITE
+  )
+  const canMutate = canWrite && complianceConfirmed
   const isEnabled = row.original.plan.enabled
   const toggleLabel = isEnabled ? t('Disable') : t('Enable')
 
   const handleEdit = () => {
+    if (!canMutate) return
     setCurrentRow(row.original)
     setOpen('update')
   }
 
   const handleToggleStatus = () => {
+    if (!canMutate) return
     setCurrentRow(row.original)
     setOpen('toggle-status')
   }
 
   const handleResetSubscriptions = () => {
+    if (!canMutate) return
     setCurrentRow(row.original)
     setOpen('reset-subscriptions')
+  }
+
+  if (!canWrite) {
+    return null
   }
 
   return (
@@ -63,7 +83,7 @@ export function DataTableRowActions({ row }: DataTableRowActionsProps) {
             <Button
               variant='ghost'
               size='icon-sm'
-              disabled={!complianceConfirmed}
+              disabled={!canMutate}
               onClick={handleEdit}
               aria-label={t('Edit')}
             />
@@ -80,7 +100,7 @@ export function DataTableRowActions({ row }: DataTableRowActionsProps) {
             <Button
               variant='ghost'
               size='icon-sm'
-              disabled={!complianceConfirmed}
+              disabled={!canMutate}
               onClick={handleResetSubscriptions}
               aria-label={t('Reset subscription quota')}
             />
@@ -97,7 +117,7 @@ export function DataTableRowActions({ row }: DataTableRowActionsProps) {
             <Button
               variant='ghost'
               size='icon-sm'
-              disabled={!complianceConfirmed}
+              disabled={!canMutate}
               onClick={handleToggleStatus}
               aria-label={toggleLabel}
               className={

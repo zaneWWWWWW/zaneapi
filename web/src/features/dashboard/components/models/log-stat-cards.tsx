@@ -35,6 +35,11 @@ import type {
 } from '@/features/dashboard/types'
 import { useStatus } from '@/hooks/use-status'
 import { toIntlLocale } from '@/i18n/languages'
+import {
+  ADMIN_PERMISSION_ACTIONS,
+  ADMIN_PERMISSION_RESOURCES,
+  hasPermission,
+} from '@/lib/admin-permissions'
 import { formatCompactNumber, formatNumber, formatQuota } from '@/lib/format'
 import { computeTimeRange } from '@/lib/time'
 import { cn } from '@/lib/utils'
@@ -69,7 +74,11 @@ export function LogStatCards(props: LogStatCardsProps) {
     language: i18n.resolvedLanguage || i18n.language,
     status,
   })
-  const isAdmin = !!(user?.role && user.role >= 10)
+  const isAdmin = hasPermission(
+    user,
+    ADMIN_PERMISSION_RESOURCES.DASHBOARD,
+    ADMIN_PERMISSION_ACTIONS.READ
+  )
   const [stats, setStats] = useState<{
     totalQuota: number
     totalCount: number

@@ -65,6 +65,7 @@ import { Textarea } from '@/components/ui/textarea'
 import {
   ADMIN_PERMISSION_ACTIONS,
   ADMIN_PERMISSION_RESOURCES,
+  applyAdminPermissionPreset,
   EMPTY_PERMISSION_CATALOG,
   hasPermission,
   normalizeAdminPermissions,
@@ -89,7 +90,7 @@ import {
   transformFormDataToPayload,
   transformUserToFormDefaults,
 } from '../lib'
-import { type User } from '../types'
+import type { User } from '../types'
 import { UserQuotaDialog } from './user-quota-dialog'
 import { useUsers } from './users-provider'
 
@@ -136,11 +137,15 @@ export function UsersMutateDrawer({
   useEffect(() => {
     if (open && isUpdate && currentRow) {
       // For update, fetch fresh data
-      getUser(currentRow.id).then((result) => {
-        if (result.success && result.data) {
-          form.reset(transformUserToFormDefaults(result.data))
-        }
-      })
+      void getUser(currentRow.id)
+        .then((result) => {
+          if (result.success && result.data) {
+            form.reset(transformUserToFormDefaults(result.data))
+          }
+        })
+        .catch(() => {
+          // Keep the drawer usable with the row already loaded.
+        })
     } else if (open && !isUpdate) {
       // For create, reset to defaults
       form.reset(USER_FORM_DEFAULT_VALUES)
@@ -195,7 +200,7 @@ export function UsersMutateDrawer({
               : t(ERROR_MESSAGES.CREATE_FAILED))
         )
       }
-    } catch (_error) {
+    } catch {
       toast.error(t(ERROR_MESSAGES.UNEXPECTED))
     } finally {
       setIsSubmitting(false)
@@ -360,12 +365,10 @@ export function UsersMutateDrawer({
                       <FormItem>
                         <FormLabel>{t('Group')}</FormLabel>
                         <Select
-                          items={[
-                            ...groups.map((group) => ({
-                              value: group,
-                              label: group,
-                            })),
-                          ]}
+                          items={groups.map((group) => ({
+                            value: group,
+                            label: group,
+                          }))}
                           onValueChange={field.onChange}
                           value={field.value}
                         >
@@ -459,7 +462,7 @@ export function UsersMutateDrawer({
                     </h3>
                     <p className='text-muted-foreground text-xs'>
                       {t(
-                        'Default administrator permissions can be overridden for this user.'
+                        'Choose a read-only or operational admin preset, then adjust individual extra admin features.'
                       )}
                     </p>
                     <FormField
@@ -472,6 +475,38 @@ export function UsersMutateDrawer({
                         )
                         return (
                           <FormItem>
+                            <div className='flex flex-wrap gap-2'>
+                              <Button
+                                type='button'
+                                size='sm'
+                                variant='outline'
+                                onClick={() =>
+                                  field.onChange(
+                                    applyAdminPermissionPreset(
+                                      permissionCatalog,
+                                      'readonly'
+                                    )
+                                  )
+                                }
+                              >
+                                {t('Read-only admin')}
+                              </Button>
+                              <Button
+                                type='button'
+                                size='sm'
+                                variant='outline'
+                                onClick={() =>
+                                  field.onChange(
+                                    applyAdminPermissionPreset(
+                                      permissionCatalog,
+                                      'operational'
+                                    )
+                                  )
+                                }
+                              >
+                                {t('Operational admin')}
+                              </Button>
+                            </div>
                             <div className='space-y-3'>
                               {permissionCatalog.resources.map((resource) => (
                                 <div

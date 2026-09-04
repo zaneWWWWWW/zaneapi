@@ -119,8 +119,8 @@ export function PublicHeader(props: PublicHeaderProps) {
         className={cn(
           'pointer-events-auto border-b transition-colors duration-200',
           scrolled
-            ? 'bg-background/90 border-border backdrop-blur-xl'
-            : 'bg-background/75 border-transparent backdrop-blur-md'
+            ? 'bg-background border-border'
+            : 'bg-background border-transparent'
         )}
       >
         <div className='mx-auto flex h-14 max-w-7xl items-center justify-between px-4 md:px-6'>

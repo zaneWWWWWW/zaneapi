@@ -39,7 +39,10 @@ import {
   getOptionValue,
   useSystemOptions,
 } from '@/features/system-settings/hooks/use-system-options'
+import { useStatus } from '@/hooks/use-status'
+import { ROLE } from '@/lib/roles'
 import { cn } from '@/lib/utils'
+import { useAuthStore } from '@/stores/auth-store'
 
 import { getChannelNames, getUptimeStatus } from '../api'
 import {
@@ -79,7 +82,12 @@ function MonitorRow(props: { monitor: UptimeMonitor }) {
 
 export function UptimeKumaSheet(props: UptimeKumaSheetProps) {
   const { t } = useTranslation()
-  const optionsQuery = useSystemOptions()
+  const { status } = useStatus()
+  const isRoot = useAuthStore(
+    (state) => state.auth.user?.role === ROLE.SUPER_ADMIN
+  )
+  const probeEnabled = Boolean(status) && status?.uptime_kuma_enabled !== false
+  const optionsQuery = useSystemOptions({ enabled: props.open && isRoot })
   const channelNamesQuery = useQuery({
     queryKey: ['channel-names'],
     queryFn: getChannelNames,
@@ -91,7 +99,7 @@ export function UptimeKumaSheet(props: UptimeKumaSheetProps) {
   const statusQuery = useQuery({
     queryKey: ['uptime-kuma-status'],
     queryFn: getUptimeStatus,
-    enabled: props.open && settings['console_setting.uptime_kuma_enabled'],
+    enabled: props.open && probeEnabled,
     staleTime: 60 * 1000,
     retry: false,
   })
@@ -110,7 +118,7 @@ export function UptimeKumaSheet(props: UptimeKumaSheetProps) {
   )
 
   let statusContent
-  if (!settings['console_setting.uptime_kuma_enabled']) {
+  if (!probeEnabled) {
     statusContent = (
       <p className='text-muted-foreground text-sm'>
         {t('Enable Uptime Kuma in Settings to load probes.')}
@@ -172,7 +180,9 @@ export function UptimeKumaSheet(props: UptimeKumaSheetProps) {
           <Tabs defaultValue='status'>
             <TabsList>
               <TabsTrigger value='status'>{t('Status')}</TabsTrigger>
-              <TabsTrigger value='settings'>{t('Settings')}</TabsTrigger>
+              {isRoot ? (
+                <TabsTrigger value='settings'>{t('Settings')}</TabsTrigger>
+              ) : null}
             </TabsList>
             <TabsContent value='status' className='mt-4'>
               <div className='mb-3 flex justify-end'>
@@ -196,12 +206,14 @@ export function UptimeKumaSheet(props: UptimeKumaSheetProps) {
               </div>
               {statusContent}
             </TabsContent>
-            <TabsContent value='settings' className='mt-4'>
-              <UptimeKumaSettings
-                enabled={settings['console_setting.uptime_kuma_enabled']}
-                data={settings['console_setting.uptime_kuma_groups']}
-              />
-            </TabsContent>
+            {isRoot ? (
+              <TabsContent value='settings' className='mt-4'>
+                <UptimeKumaSettings
+                  enabled={settings['console_setting.uptime_kuma_enabled']}
+                  data={settings['console_setting.uptime_kuma_groups']}
+                />
+              </TabsContent>
+            ) : null}
           </Tabs>
         </div>
       </SheetContent>

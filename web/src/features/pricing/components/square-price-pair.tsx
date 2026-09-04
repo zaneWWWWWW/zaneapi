@@ -20,7 +20,7 @@ import { useTranslation } from 'react-i18next'
 
 import { cn } from '@/lib/utils'
 
-import { formatSquareGroupRatio, type SquarePricePair } from '../lib/price'
+import { formatSquareGroupPriceLabel, type SquarePricePair } from '../lib/price'
 
 type SquarePricePairViewProps = SquarePricePair & {
   className?: string
@@ -29,9 +29,12 @@ type SquarePricePairViewProps = SquarePricePair & {
 
 export function SquarePricePairView(props: SquarePricePairViewProps) {
   const { t } = useTranslation()
-  const ratioLabel = formatSquareGroupRatio(props.groupRatio)
+  const groupPriceLabel = formatSquareGroupPriceLabel(
+    props.own,
+    props.groupRatio
+  )
   const title = props.differs
-    ? `${t('Model price')}: ${props.own}; ${t('After group ratio')}: ${props.grouped}`
+    ? `${t('Model price')}: ${props.own}; ${t('After group ratio')}: ${groupPriceLabel}`
     : `${t('Model price')}: ${props.own}`
 
   if (!props.differs) {
@@ -61,8 +64,7 @@ export function SquarePricePairView(props: SquarePricePairViewProps) {
         {props.own}
       </span>
       <span className='text-muted-foreground font-mono text-[11px] leading-tight'>
-        {props.grouped}
-        <span className='ml-1 opacity-70'>×{ratioLabel}</span>
+        {groupPriceLabel}
       </span>
     </span>
   )

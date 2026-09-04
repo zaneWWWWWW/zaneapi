@@ -17,7 +17,7 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 For commercial licensing, please contact support@quantumnous.com
 */
 import { useQueryClient } from '@tanstack/react-query'
-import { type Table } from '@tanstack/react-table'
+import type { Table } from '@tanstack/react-table'
 import { Power, PowerOff, Trash2, Copy } from 'lucide-react'
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
@@ -31,7 +31,13 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from '@/components/ui/tooltip'
+import {
+  ADMIN_PERMISSION_ACTIONS,
+  ADMIN_PERMISSION_RESOURCES,
+  hasPermission,
+} from '@/lib/admin-permissions'
 import { copyToClipboard } from '@/lib/copy-to-clipboard'
+import { useAuthStore } from '@/stores/auth-store'
 
 import {
   handleBatchEnableModels,
@@ -50,6 +56,12 @@ export function DataTableBulkActions<TData>({
   const { t } = useTranslation()
   const queryClient = useQueryClient()
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
+  const currentUser = useAuthStore((s) => s.auth.user)
+  const canWrite = hasPermission(
+    currentUser,
+    ADMIN_PERMISSION_RESOURCES.MODELS,
+    ADMIN_PERMISSION_ACTIONS.WRITE
+  )
 
   const selectedRows = table.getFilteredSelectedRowModel().rows
   const selectedIds = selectedRows.reduce<number[]>((ids, row) => {
@@ -69,14 +81,17 @@ export function DataTableBulkActions<TData>({
   }
 
   const handleEnableAll = () => {
+    if (!canWrite) return
     handleBatchEnableModels(selectedIds, queryClient, handleClearSelection)
   }
 
   const handleDisableAll = () => {
+    if (!canWrite) return
     handleBatchDisableModels(selectedIds, queryClient, handleClearSelection)
   }
 
   const handleDeleteAll = () => {
+    if (!canWrite) return
     handleBatchDeleteModels(selectedIds, queryClient, () => {
       setShowDeleteConfirm(false)
       handleClearSelection()
@@ -103,9 +118,14 @@ export function DataTableBulkActions<TData>({
                 variant='outline'
                 size='icon'
                 onClick={handleEnableAll}
+                disabled={!canWrite}
                 className='size-8'
                 aria-label={t('Enable selected models')}
-                title={t('Enable selected models')}
+                title={
+                  canWrite
+                    ? t('Enable selected models')
+                    : t('No permission to perform this action')
+                }
               />
             }
           >
@@ -113,7 +133,11 @@ export function DataTableBulkActions<TData>({
             <span className='sr-only'>{t('Enable selected models')}</span>
           </TooltipTrigger>
           <TooltipContent>
-            <p>{t('Enable selected models')}</p>
+            <p>
+              {canWrite
+                ? t('Enable selected models')
+                : t('No permission to perform this action')}
+            </p>
           </TooltipContent>
         </Tooltip>
 
@@ -124,9 +148,14 @@ export function DataTableBulkActions<TData>({
                 variant='outline'
                 size='icon'
                 onClick={handleDisableAll}
+                disabled={!canWrite}
                 className='size-8'
                 aria-label={t('Disable selected models')}
-                title={t('Disable selected models')}
+                title={
+                  canWrite
+                    ? t('Disable selected models')
+                    : t('No permission to perform this action')
+                }
               />
             }
           >
@@ -134,7 +163,11 @@ export function DataTableBulkActions<TData>({
             <span className='sr-only'>{t('Disable selected models')}</span>
           </TooltipTrigger>
           <TooltipContent>
-            <p>{t('Disable selected models')}</p>
+            <p>
+              {canWrite
+                ? t('Disable selected models')
+                : t('No permission to perform this action')}
+            </p>
           </TooltipContent>
         </Tooltip>
 
@@ -165,10 +198,18 @@ export function DataTableBulkActions<TData>({
               <Button
                 variant='destructive'
                 size='icon'
-                onClick={() => setShowDeleteConfirm(true)}
+                onClick={() => {
+                  if (!canWrite) return
+                  setShowDeleteConfirm(true)
+                }}
+                disabled={!canWrite}
                 className='size-8'
                 aria-label={t('Delete selected models')}
-                title={t('Delete selected models')}
+                title={
+                  canWrite
+                    ? t('Delete selected models')
+                    : t('No permission to perform this action')
+                }
               />
             }
           >
@@ -176,7 +217,11 @@ export function DataTableBulkActions<TData>({
             <span className='sr-only'>{t('Delete selected models')}</span>
           </TooltipTrigger>
           <TooltipContent>
-            <p>{t('Delete selected models')}</p>
+            <p>
+              {canWrite
+                ? t('Delete selected models')
+                : t('No permission to perform this action')}
+            </p>
           </TooltipContent>
         </Tooltip>
       </BulkActionsToolbar>
@@ -199,7 +244,11 @@ export function DataTableBulkActions<TData>({
             >
               {t('Cancel')}
             </Button>
-            <Button variant='destructive' onClick={handleDeleteAll}>
+            <Button
+              variant='destructive'
+              onClick={handleDeleteAll}
+              disabled={!canWrite}
+            >
               {t('Delete')}
             </Button>
           </>

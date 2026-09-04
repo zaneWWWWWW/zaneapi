@@ -72,7 +72,9 @@ export function SidebarModulesSection({
     },
     console: {
       title: t('Console area'),
-      description: t('Dashboard, API keys, and usage logs.'),
+      description: t(
+        'Dashboard, API keys, usage logs, Model Square, and rankings.'
+      ),
     },
     personal: {
       title: t('Personal area'),
@@ -124,6 +126,14 @@ export function SidebarModulesSection({
       task: {
         title: t('Task logs'),
         description: t('Background job tracker for queued work.'),
+      },
+      pricing: {
+        title: t('Model Square'),
+        description: t('Browse models and prices'),
+      },
+      rankings: {
+        title: t('Rankings'),
+        description: t('View model rankings'),
       },
     },
     personal: {
@@ -219,8 +229,7 @@ export function SidebarModulesSection({
                 ? []
                 : Object.entries(sectionConfig).filter(
                     ([moduleKey]) =>
-                      moduleKey !== 'enabled' &&
-                      knownModules[moduleKey] != null
+                      moduleKey !== 'enabled' && knownModules[moduleKey] != null
                   )
 
             return (
@@ -259,42 +268,44 @@ export function SidebarModulesSection({
                 />
 
                 {modules.length === 0 ? null : (
-                <SettingsControlChildren className='grid gap-3 md:grid-cols-2'>
-                  {modules.map(([moduleKey]) => {
-                    const moduleInfo = moduleMeta[sectionKey]?.[moduleKey] ?? {
-                      title: toTitleCase(moduleKey),
-                      description: t('Custom module'),
-                    }
-                    return (
-                      <FormField
-                        key={`${sectionKey}.${moduleKey}`}
-                        control={form.control}
-                        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                        name={`${sectionKey}.${moduleKey}` as any}
-                        render={({ field }) => (
-                          <SettingsSwitchItem className='py-2'>
-                            <SettingsSwitchContent>
-                              <FormLabel>{moduleInfo.title}</FormLabel>
-                              <FormDescription>
-                                {moduleInfo.description}
-                              </FormDescription>
-                            </SettingsSwitchContent>
-                            <FormControl>
-                              <Switch
-                                checked={Boolean(field.value)}
-                                onCheckedChange={field.onChange}
-                                disabled={
-                                  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                                  !form.watch(`${sectionKey}.enabled` as any)
-                                }
-                              />
-                            </FormControl>
-                          </SettingsSwitchItem>
-                        )}
-                      />
-                    )
-                  })}
-                </SettingsControlChildren>
+                  <SettingsControlChildren className='grid gap-3 md:grid-cols-2'>
+                    {modules.map(([moduleKey]) => {
+                      const moduleInfo = moduleMeta[sectionKey]?.[
+                        moduleKey
+                      ] ?? {
+                        title: toTitleCase(moduleKey),
+                        description: t('Custom module'),
+                      }
+                      return (
+                        <FormField
+                          key={`${sectionKey}.${moduleKey}`}
+                          control={form.control}
+                          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                          name={`${sectionKey}.${moduleKey}` as any}
+                          render={({ field }) => (
+                            <SettingsSwitchItem className='py-2'>
+                              <SettingsSwitchContent>
+                                <FormLabel>{moduleInfo.title}</FormLabel>
+                                <FormDescription>
+                                  {moduleInfo.description}
+                                </FormDescription>
+                              </SettingsSwitchContent>
+                              <FormControl>
+                                <Switch
+                                  checked={Boolean(field.value)}
+                                  onCheckedChange={field.onChange}
+                                  disabled={
+                                    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                                    !form.watch(`${sectionKey}.enabled` as any)
+                                  }
+                                />
+                              </FormControl>
+                            </SettingsSwitchItem>
+                          )}
+                        />
+                      )
+                    })}
+                  </SettingsControlChildren>
                 )}
               </SettingsControlGroup>
             )

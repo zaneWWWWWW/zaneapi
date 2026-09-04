@@ -95,6 +95,16 @@ export function DataTableRowActions({ row }: DataTableRowActionsProps) {
     ADMIN_PERMISSION_RESOURCES.CHANNEL,
     ADMIN_PERMISSION_ACTIONS.SENSITIVE_WRITE
   )
+  const canOperate = hasPermission(
+    currentUser,
+    ADMIN_PERMISSION_RESOURCES.CHANNEL,
+    ADMIN_PERMISSION_ACTIONS.OPERATE
+  )
+  const canWrite = hasPermission(
+    currentUser,
+    ADMIN_PERMISSION_RESOURCES.CHANNEL,
+    ADMIN_PERMISSION_ACTIONS.WRITE
+  )
 
   const handleEdit = () => {
     setCurrentRow(channel)
@@ -175,6 +185,7 @@ export function DataTableRowActions({ row }: DataTableRowActionsProps) {
                   e.stopPropagation()
                   handleEdit()
                 }}
+                disabled={!canWrite}
                 aria-label={t('Edit')}
               />
             }
@@ -192,7 +203,7 @@ export function DataTableRowActions({ row }: DataTableRowActionsProps) {
               variant='ghost'
               size='icon-sm'
               onClick={handleDirectTest}
-              disabled={isTesting}
+              disabled={isTesting || !canOperate}
               aria-label={t('Test Connection')}
             />
           }
@@ -217,6 +228,7 @@ export function DataTableRowActions({ row }: DataTableRowActionsProps) {
                   e.stopPropagation()
                   handleTest()
                 }}
+                disabled={!canOperate}
                 aria-label={t('Test Channel Connection')}
               />
             }
@@ -234,7 +246,7 @@ export function DataTableRowActions({ row }: DataTableRowActionsProps) {
               variant='ghost'
               size='icon-sm'
               onClick={handleToggleStatus}
-              disabled={isTogglingStatus}
+              disabled={isTogglingStatus || !canOperate}
               aria-label={isEnabled ? t('Disable') : t('Enable')}
               className={
                 isEnabled
@@ -265,7 +277,7 @@ export function DataTableRowActions({ row }: DataTableRowActionsProps) {
         </DropdownMenuTrigger>
         <DropdownMenuContent align='end' className='w-48'>
           {layout === 'card' && (
-            <DropdownMenuItem onClick={handleEdit}>
+            <DropdownMenuItem onClick={handleEdit} disabled={!canWrite}>
               {t('Edit')}
               <DropdownMenuShortcut>
                 <Pencil size={16} />
@@ -274,7 +286,7 @@ export function DataTableRowActions({ row }: DataTableRowActionsProps) {
           )}
 
           {/* Test Connection */}
-          <DropdownMenuItem onClick={handleTest}>
+          <DropdownMenuItem onClick={handleTest} disabled={!canOperate}>
             {t('Test Connection')}
             <DropdownMenuShortcut>
               <PlugZap size={16} />
@@ -282,7 +294,7 @@ export function DataTableRowActions({ row }: DataTableRowActionsProps) {
           </DropdownMenuItem>
 
           {/* Query Balance */}
-          <DropdownMenuItem onClick={handleQueryBalance}>
+          <DropdownMenuItem onClick={handleQueryBalance} disabled={!canOperate}>
             {t('Query Balance')}
             <DropdownMenuShortcut>
               <DollarSign size={16} />
@@ -290,7 +302,7 @@ export function DataTableRowActions({ row }: DataTableRowActionsProps) {
           </DropdownMenuItem>
 
           {/* Fetch Models */}
-          <DropdownMenuItem onClick={handleFetchModels}>
+          <DropdownMenuItem onClick={handleFetchModels} disabled={!canOperate}>
             {t('Fetch Models')}
             <DropdownMenuShortcut>
               <Download size={16} />
@@ -300,7 +312,9 @@ export function DataTableRowActions({ row }: DataTableRowActionsProps) {
           {/* Detect Upstream Updates (only for fetchable channel types) */}
           {MODEL_FETCHABLE_TYPES.has(channel.type) && (
             <DropdownMenuItem
+              disabled={!canOperate}
               onClick={() => {
+                if (!canOperate) return
                 const meta = parseUpstreamUpdateMeta(channel.settings)
                 if (
                   meta.pendingAddModels.length > 0 ||
@@ -313,7 +327,7 @@ export function DataTableRowActions({ row }: DataTableRowActionsProps) {
                     meta.pendingAddModels.length > 0 ? 'add' : 'remove'
                   )
                 } else {
-                  upstream.detectChannelUpdates(channel)
+                  void upstream.detectChannelUpdates(channel)
                 }
               }}
             >
@@ -326,7 +340,10 @@ export function DataTableRowActions({ row }: DataTableRowActionsProps) {
 
           {/* Ollama Models (only for Ollama channels) */}
           {channel.type === 4 && (
-            <DropdownMenuItem onClick={handleManageOllamaModels}>
+            <DropdownMenuItem
+              onClick={handleManageOllamaModels}
+              disabled={!canEditSensitive}
+            >
               {t('Manage Ollama Models')}
               <DropdownMenuShortcut>
                 <Boxes size={16} />
@@ -354,7 +371,7 @@ export function DataTableRowActions({ row }: DataTableRowActionsProps) {
 
           {/* Manage Keys (only for multi-key channels) */}
           {isMultiKey && (
-            <DropdownMenuItem onClick={handleManageKeys}>
+            <DropdownMenuItem onClick={handleManageKeys} disabled={!canOperate}>
               {t('Manage Keys')}
               <DropdownMenuShortcut>
                 <Key size={16} />

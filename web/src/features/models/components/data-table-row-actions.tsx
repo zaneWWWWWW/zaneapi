@@ -34,6 +34,12 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from '@/components/ui/tooltip'
+import {
+  ADMIN_PERMISSION_ACTIONS,
+  ADMIN_PERMISSION_RESOURCES,
+  hasPermission,
+} from '@/lib/admin-permissions'
+import { useAuthStore } from '@/stores/auth-store'
 
 import {
   handleDeleteModel,
@@ -55,6 +61,12 @@ export function DataTableRowActions({ row }: DataTableRowActionsProps) {
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false)
 
   const isEnabled = isModelEnabled(model)
+  const currentUser = useAuthStore((s) => s.auth.user)
+  const canWrite = hasPermission(
+    currentUser,
+    ADMIN_PERMISSION_RESOURCES.MODELS,
+    ADMIN_PERMISSION_ACTIONS.WRITE
+  )
 
   const handleEdit = () => {
     setCurrentRow(model)
@@ -66,6 +78,10 @@ export function DataTableRowActions({ row }: DataTableRowActionsProps) {
   }
 
   const toggleLabel = isEnabled ? t('Disable') : t('Enable')
+
+  if (!canWrite) {
+    return null
+  }
 
   return (
     <div className='-ml-1.5 flex items-center gap-1'>

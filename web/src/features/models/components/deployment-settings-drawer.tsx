@@ -36,6 +36,8 @@ import {
   useSystemOptions,
 } from '@/features/system-settings/hooks/use-system-options'
 import { IoNetDeploymentSettingsSection } from '@/features/system-settings/integrations/ionet-deployment-settings-section'
+import { ROLE } from '@/lib/roles'
+import { useAuthStore } from '@/stores/auth-store'
 
 const DEPLOYMENT_OPTION_DEFAULTS = {
   'model_deployment.ionet.enabled': false,
@@ -49,7 +51,12 @@ type DeploymentSettingsDrawerProps = {
 
 export function DeploymentSettingsDrawer(props: DeploymentSettingsDrawerProps) {
   const { t } = useTranslation()
-  const { data, isLoading } = useSystemOptions()
+  const isRoot = useAuthStore(
+    (state) => state.auth.user?.role === ROLE.SUPER_ADMIN
+  )
+  const { data, isLoading } = useSystemOptions({
+    enabled: props.open && isRoot,
+  })
   const [actionsContainer, setActionsContainer] =
     useState<HTMLDivElement | null>(null)
 

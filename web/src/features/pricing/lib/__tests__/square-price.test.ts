@@ -22,6 +22,7 @@ import { describe, test } from 'node:test'
 import type { PricingModel } from '../../types'
 import {
   formatPrice,
+  formatSquareGroupPriceLabel,
   formatSquareGroupRatio,
   getSquareRequestPricePair,
   getSquareTokenPricePair,
@@ -89,5 +90,18 @@ describe('model square price pairs', () => {
     assert.equal(formatSquareGroupRatio(1), '1')
     assert.equal(formatSquareGroupRatio(0.5), '0.5')
     assert.equal(formatSquareGroupRatio(1.25), '1.25')
+  })
+
+  test('shows the model price concatenated with the group ratio instead of the multiplied result', () => {
+    const pair = getSquareTokenPricePair(tokenModel(), 'input', 'M')
+
+    assert.equal(
+      formatSquareGroupPriceLabel(pair.own, pair.groupRatio),
+      `${pair.own}×0.5`
+    )
+    assert.notEqual(
+      formatSquareGroupPriceLabel(pair.own, pair.groupRatio),
+      pair.grouped
+    )
   })
 })

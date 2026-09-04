@@ -25,6 +25,13 @@ import { useTranslation } from 'react-i18next'
 import { SectionPageLayout } from '@/components/layout'
 import { Button } from '@/components/ui/button'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import {
+  ADMIN_PERMISSION_ACTIONS,
+  ADMIN_PERMISSION_RESOURCES,
+  hasPermission,
+} from '@/lib/admin-permissions'
+import { ROLE } from '@/lib/roles'
+import { useAuthStore } from '@/stores/auth-store'
 
 import { listDeployments } from './api'
 import { DeploymentAccessGuard } from './components/deployment-access-guard'
@@ -66,9 +73,24 @@ function ModelsContent() {
   const { tabCategory, setTabCategory } = useModels()
   const params = route.useParams()
   const search = route.useSearch()
+  const user = useAuthStore((state) => state.auth.user)
+  const isRoot = user?.role === ROLE.SUPER_ADMIN
+  const canWrite = hasPermission(
+    user,
+    ADMIN_PERMISSION_RESOURCES.MODELS,
+    ADMIN_PERMISSION_ACTIONS.WRITE
+  )
   const activeSection = (params.section ??
     MODELS_DEFAULT_SECTION) as ModelsSectionId
   const workspaceView = search.view ?? MODEL_WORKSPACE_DEFAULT_VIEW
+  const visibleWorkspaceViews = isRoot
+    ? MODEL_WORKSPACE_VIEWS
+    : MODEL_WORKSPACE_VIEWS.filter((view) => view.id === 'catalog')
+  const effectiveWorkspaceView = visibleWorkspaceViews.some(
+    (view) => view.id === workspaceView
+  )
+    ? workspaceView
+    : MODEL_WORKSPACE_DEFAULT_VIEW
 
   const [createDeploymentOpen, setCreateDeploymentOpen] = useState(false)
   const [deploymentSettingsOpen, setDeploymentSettingsOpen] = useState(false)
@@ -110,37 +132,43 @@ function ModelsContent() {
 
   const meta = SECTION_META[activeSection] ?? SECTION_META.metadata
   const activeWorkspaceView =
-    MODEL_WORKSPACE_VIEWS.find((view) => view.id === workspaceView) ??
-    MODEL_WORKSPACE_VIEWS[0]
+    visibleWorkspaceViews.find((view) => view.id === effectiveWorkspaceView) ??
+    visibleWorkspaceViews[0]
   const pricingTab =
     'pricingTab' in activeWorkspaceView
       ? activeWorkspaceView.pricingTab
       : undefined
   let sectionActions = null
-  if (activeSection === 'metadata' && workspaceView === 'catalog') {
+  if (activeSection === 'metadata' && effectiveWorkspaceView === 'catalog') {
     sectionActions = <ModelsPrimaryButtons />
-  } else if (activeSection === 'deployments') {
+  } else if (activeSection === 'deployments' && (isRoot || canWrite)) {
     sectionActions = (
       <>
-        <Button
-          variant='outline'
-          size='sm'
-          onClick={() => setDeploymentSettingsOpen(true)}
-        >
-          <Settings className='h-4 w-4' />
-          {t('Deployment settings')}
-        </Button>
-        <Button onClick={() => setCreateDeploymentOpen(true)} size='sm'>
-          <Plus className='h-4 w-4' />
-          {t('Create deployment')}
-        </Button>
+        {isRoot ? (
+          <Button
+            variant='outline'
+            size='sm'
+            onClick={() => setDeploymentSettingsOpen(true)}
+          >
+            <Settings className='h-4 w-4' />
+            {t('Deployment settings')}
+          </Button>
+        ) : null}
+        {canWrite ? (
+          <Button onClick={() => setCreateDeploymentOpen(true)} size='sm'>
+            <Plus className='h-4 w-4' />
+            {t('Create deployment')}
+          </Button>
+        ) : null}
       </>
     )
   }
   let sectionContent = (
     <DeploymentsSection
       deployment={deployment}
-      onOpenSettings={() => setDeploymentSettingsOpen(true)}
+      onOpenSettings={
+        isRoot ? () => setDeploymentSettingsOpen(true) : undefined
+      }
     />
   )
   if (activeSection === 'metadata') {
@@ -173,13 +201,14 @@ function ModelsContent() {
                   ))}
                 </TabsList>
               </Tabs>
-              {activeSection === 'metadata' ? (
+              {activeSection === 'metadata' &&
+              visibleWorkspaceViews.length > 1 ? (
                 <Tabs
-                  value={workspaceView}
+                  value={effectiveWorkspaceView}
                   onValueChange={handleWorkspaceViewChange}
                 >
                   <TabsList className='max-w-full flex-wrap justify-start group-data-horizontal/tabs:h-auto'>
-                    {MODEL_WORKSPACE_VIEWS.map((view) => (
+                    {visibleWorkspaceViews.map((view) => (
                       <TabsTrigger key={view.id} value={view.id}>
                         {t(view.titleKey)}
                       </TabsTrigger>
@@ -214,7 +243,7 @@ function DeploymentsSection({
   onOpenSettings,
 }: {
   deployment: ReturnType<typeof useModelDeploymentSettings>
-  onOpenSettings: () => void
+  onOpenSettings?: () => void
 }) {
   const queryClient = useQueryClient()
   const {

@@ -18,6 +18,13 @@ For commercial licensing, please contact support@quantumnous.com
 */
 import { useCallback, useEffect, useRef, useState } from 'react'
 
+import {
+  ADMIN_PERMISSION_ACTIONS,
+  ADMIN_PERMISSION_RESOURCES,
+  hasPermission,
+} from '@/lib/admin-permissions'
+import { useAuthStore } from '@/stores/auth-store'
+
 import { getDeploymentSettings, testDeploymentConnection } from '../api'
 
 interface ConnectionState {
@@ -53,6 +60,13 @@ export function clearConnectionCache() {
 type LoadingPhase = 'idle' | 'settings' | 'connection' | 'done'
 
 export function useModelDeploymentSettings() {
+  const canWrite = useAuthStore((state) =>
+    hasPermission(
+      state.auth.user,
+      ADMIN_PERMISSION_RESOURCES.MODELS,
+      ADMIN_PERMISSION_ACTIONS.WRITE
+    )
+  )
   const [loading, setLoading] = useState(true)
   const [loadingPhase, setLoadingPhase] = useState<LoadingPhase>('settings')
   const [settings, setSettings] = useState<Record<string, unknown>>({
@@ -66,66 +80,76 @@ export function useModelDeploymentSettings() {
   const initialLoadRef = useRef(true)
 
   // Parallel fetch: settings + connection test (when enabled)
-  const fetchAll = useCallback(async (useCache = true) => {
-    setLoading(true)
-    setLoadingPhase('settings')
+  const fetchAll = useCallback(
+    async (useCache = true) => {
+      setLoading(true)
+      setLoadingPhase('settings')
 
-    try {
-      // Step 1: Fetch settings first (usually fast)
-      const response = await getDeploymentSettings()
-      const isEnabled = response?.success && response?.data?.enabled === true
+      try {
+        // Step 1: Fetch settings first (usually fast)
+        const response = await getDeploymentSettings()
+        const isEnabled = response?.success && response?.data?.enabled === true
 
-      setSettings({
-        'model_deployment.ionet.enabled': isEnabled,
-      })
+        setSettings({
+          'model_deployment.ionet.enabled': isEnabled,
+        })
 
-      if (!isEnabled) {
-        // Not enabled, done
-        setConnectionState({ loading: false, ok: null, error: null })
-        setLoadingPhase('done')
-        setLoading(false)
-        return
-      }
-
-      // Step 2: Check connection (check cache first)
-      if (useCache) {
-        const cached = getCachedConnection()
-        if (cached !== null) {
-          setConnectionState({ loading: false, ok: cached, error: null })
+        if (!isEnabled) {
+          // Not enabled, done
+          setConnectionState({ loading: false, ok: null, error: null })
           setLoadingPhase('done')
           setLoading(false)
           return
         }
-      }
 
-      // Test connection
-      setLoadingPhase('connection')
-      setConnectionState({ loading: true, ok: null, error: null })
-
-      try {
-        const connResponse = await testDeploymentConnection()
-        if (connResponse?.success) {
-          setCachedConnection(true)
-          setConnectionState({ loading: false, ok: true, error: null })
-        } else {
-          const message = connResponse?.message || 'Connection failed'
-          setCachedConnection(false)
-          setConnectionState({ loading: false, ok: false, error: message })
+        if (!canWrite) {
+          setConnectionState({ loading: false, ok: null, error: null })
+          setLoadingPhase('done')
+          setLoading(false)
+          return
         }
-      } catch (error: unknown) {
-        const errMsg =
-          error instanceof Error ? error.message : 'Connection failed'
-        setCachedConnection(false)
-        setConnectionState({ loading: false, ok: false, error: errMsg })
+
+        // Step 2: Check connection (check cache first)
+        if (useCache) {
+          const cached = getCachedConnection()
+          if (cached !== null) {
+            setConnectionState({ loading: false, ok: cached, error: null })
+            setLoadingPhase('done')
+            setLoading(false)
+            return
+          }
+        }
+
+        // Test connection
+        setLoadingPhase('connection')
+        setConnectionState({ loading: true, ok: null, error: null })
+
+        try {
+          const connResponse = await testDeploymentConnection()
+          if (connResponse?.success) {
+            setCachedConnection(true)
+            setConnectionState({ loading: false, ok: true, error: null })
+          } else {
+            const message = connResponse?.message || 'Connection failed'
+            setCachedConnection(false)
+            setConnectionState({ loading: false, ok: false, error: message })
+          }
+        } catch (error: unknown) {
+          const errMsg =
+            error instanceof Error ? error.message : 'Connection failed'
+          setCachedConnection(false)
+          setConnectionState({ loading: false, ok: false, error: errMsg })
+        }
+      } catch {
+        // Settings fetch failed, use defaults
+        setConnectionState({ loading: false, ok: null, error: null })
+      } finally {
+        setLoadingPhase('done')
+        setLoading(false)
       }
-    } catch {
-      // Settings fetch failed, use defaults
-      setConnectionState({ loading: false, ok: null, error: null })
-    } finally {
-      setLoadingPhase('done')
-      setLoading(false)
-    }
-  }, [])
+    },
+    [canWrite]
+  )
 
   // Initial load
   useEffect(() => {
@@ -139,6 +163,7 @@ export function useModelDeploymentSettings() {
 
   // Manual retry (skip cache)
   const testConnection = useCallback(async () => {
+    if (!canWrite) return
     clearConnectionCache()
     setConnectionState({ loading: true, ok: null, error: null })
     setLoadingPhase('connection')
@@ -161,7 +186,7 @@ export function useModelDeploymentSettings() {
     } finally {
       setLoadingPhase('done')
     }
-  }, [])
+  }, [canWrite])
 
   // Refresh all (skip cache)
   const refresh = useCallback(() => {
