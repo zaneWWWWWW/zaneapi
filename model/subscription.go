@@ -1060,12 +1060,17 @@ func adminResetUserSubscriptionsByPlanTx(tx *gorm.DB, userId int, plan *Subscrip
 }
 
 func adminResetPlanSubscriptionsTx(tx *gorm.DB, plan *SubscriptionPlan, now int64, advanceResetTime bool) (*SubscriptionResetResult, error) {
+	return adminResetPlanSubscriptionsScopedTx(tx, plan, now, advanceResetTime, DataScope{All: true})
+}
+
+func adminResetPlanSubscriptionsScopedTx(tx *gorm.DB, plan *SubscriptionPlan, now int64, advanceResetTime bool, userScope DataScope) (*SubscriptionResetResult, error) {
 	if tx == nil || plan == nil {
 		return nil, errors.New("invalid reset args")
 	}
 	var subs []UserSubscription
 	if err := lockForUpdate(tx).
 		Where("plan_id = ? AND status = ? AND end_time > ?", plan.Id, "active", now).
+		Scopes(func(db *gorm.DB) *gorm.DB { return ApplyIDScope(db, "user_id", userScope) }).
 		Order("user_id asc, end_time asc, id asc").
 		Find(&subs).Error; err != nil {
 		return nil, err
@@ -1099,6 +1104,10 @@ func AdminResetUserSubscriptionsByPlan(userId int, planId int, advanceResetTime 
 }
 
 func AdminResetPlanSubscriptions(planId int, advanceResetTime bool) (*SubscriptionResetResult, error) {
+	return AdminResetPlanSubscriptionsScoped(planId, advanceResetTime, DataScope{All: true})
+}
+
+func AdminResetPlanSubscriptionsScoped(planId int, advanceResetTime bool, userScope DataScope) (*SubscriptionResetResult, error) {
 	if planId <= 0 {
 		return nil, errors.New("invalid planId")
 	}
@@ -1109,7 +1118,7 @@ func AdminResetPlanSubscriptions(planId int, advanceResetTime bool) (*Subscripti
 		if err != nil {
 			return err
 		}
-		result, err = adminResetPlanSubscriptionsTx(tx, plan, now, advanceResetTime)
+		result, err = adminResetPlanSubscriptionsScopedTx(tx, plan, now, advanceResetTime, userScope)
 		return err
 	})
 	if err != nil {

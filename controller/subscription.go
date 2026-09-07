@@ -502,7 +502,7 @@ func AdminResetPlanSubscriptions(c *gin.Context) {
 		return
 	}
 	advanceResetTime := resolveAdvanceResetTime(req.AdvanceResetTime)
-	result, err := model.AdminResetPlanSubscriptions(planId, advanceResetTime)
+	result, err := model.AdminResetPlanSubscriptionsScoped(planId, advanceResetTime, currentUserScope(c))
 	if err != nil {
 		common.ApiError(c, err)
 		return

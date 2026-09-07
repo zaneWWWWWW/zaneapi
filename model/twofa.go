@@ -398,15 +398,25 @@ func (t *TwoFA) ValidateBackupCodeAndUpdateUsage(code string) (bool, error) {
 
 // GetTwoFAStats 获取2FA统计信息（管理员使用）
 func GetTwoFAStats() (map[string]interface{}, error) {
+	return GetTwoFAStatsScoped(DataScope{All: true})
+}
+
+// GetTwoFAStatsScoped returns statistics limited to users visible to the caller.
+func GetTwoFAStatsScoped(userScope DataScope) (map[string]interface{}, error) {
 	var totalUsers, enabledUsers int64
 
 	// 总用户数
-	if err := DB.Model(&User{}).Count(&totalUsers).Error; err != nil {
+	userQuery := ApplyIDScope(DB.Model(&User{}), "id", userScope)
+	if err := userQuery.Count(&totalUsers).Error; err != nil {
 		return nil, err
 	}
 
 	// 启用2FA的用户数
-	if err := DB.Model(&TwoFA{}).Where("is_enabled = true").Count(&enabledUsers).Error; err != nil {
+	twoFAQuery := DB.Model(&TwoFA{}).Where("is_enabled = true")
+	if !userScope.All {
+		twoFAQuery = twoFAQuery.Where("user_id IN ?", userScope.IDs)
+	}
+	if err := twoFAQuery.Count(&enabledUsers).Error; err != nil {
 		return nil, err
 	}
 

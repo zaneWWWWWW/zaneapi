@@ -527,7 +527,7 @@ func Verify2FALogin(c *gin.Context) {
 
 // Admin2FAStats 管理员获取2FA统计信息
 func Admin2FAStats(c *gin.Context) {
-	stats, err := model.GetTwoFAStats()
+	stats, err := model.GetTwoFAStatsScoped(currentUserScope(c))
 	if err != nil {
 		common.ApiError(c, err)
 		return
