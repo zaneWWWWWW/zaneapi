@@ -383,6 +383,9 @@ func AdminListUserSubscriptions(c *gin.Context) {
 		common.ApiErrorMsg(c, "无效的用户ID")
 		return
 	}
+	if abortIfUserOutOfScope(c, userId) {
+		return
+	}
 	subs, err := model.GetAllUserSubscriptions(userId)
 	if err != nil {
 		common.ApiError(c, err)
@@ -428,6 +431,9 @@ func AdminCreateUserSubscription(c *gin.Context) {
 		common.ApiErrorMsg(c, "无效的用户ID")
 		return
 	}
+	if abortIfUserOutOfScope(c, userId) {
+		return
+	}
 	var req AdminCreateUserSubscriptionRequest
 	if err := c.ShouldBindJSON(&req); err != nil || req.PlanId <= 0 {
 		common.ApiErrorMsg(c, "参数错误")
@@ -449,6 +455,9 @@ func AdminResetUserSubscriptionsByPlan(c *gin.Context) {
 	userId, _ := strconv.Atoi(c.Param("id"))
 	if userId <= 0 {
 		common.ApiErrorMsg(c, "无效的用户ID")
+		return
+	}
+	if abortIfUserOutOfScope(c, userId) {
 		return
 	}
 	var req AdminResetSubscriptionRequest

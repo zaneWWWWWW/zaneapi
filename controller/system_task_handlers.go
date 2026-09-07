@@ -51,8 +51,10 @@ func (channelTestHandler) NewPayload() any { return nil }
 // Notify=true to reproduce the legacy manual behavior (test every channel and
 // notify root on completion).
 type channelTestTaskPayload struct {
-	Mode   string `json:"mode,omitempty"`
-	Notify bool   `json:"notify,omitempty"`
+	Mode       string `json:"mode,omitempty"`
+	Notify     bool   `json:"notify,omitempty"`
+	Restrict   bool   `json:"restrict,omitempty"`
+	ChannelIDs []int  `json:"channel_ids,omitempty"`
 }
 
 func (channelTestHandler) Run(ctx context.Context, task *model.SystemTask, runnerID string) {
@@ -61,7 +63,7 @@ func (channelTestHandler) Run(ctx context.Context, task *model.SystemTask, runne
 		finishSystemTaskHandler(task, runnerID, model.SystemTaskStatusFailed, nil, err)
 		return
 	}
-	summary, err := runChannelTestTask(ctx, payload.Mode, payload.Notify, service.NewSystemTaskProgressReporter(task, runnerID))
+	summary, err := runChannelTestTask(ctx, payload, service.NewSystemTaskProgressReporter(task, runnerID))
 	if err != nil {
 		finishSystemTaskHandler(task, runnerID, model.SystemTaskStatusFailed, nil, err)
 		return
@@ -98,7 +100,9 @@ func (modelUpdateHandler) NewPayload() any { return nil }
 // semantics: force a re-check regardless of the interval and never auto-apply,
 // so the admin reviews and applies changes explicitly.
 type modelUpdateTaskPayload struct {
-	Manual bool `json:"manual,omitempty"`
+	Manual     bool  `json:"manual,omitempty"`
+	Restrict   bool  `json:"restrict,omitempty"`
+	ChannelIDs []int `json:"channel_ids,omitempty"`
 }
 
 func (modelUpdateHandler) Run(ctx context.Context, task *model.SystemTask, runnerID string) {
@@ -107,7 +111,11 @@ func (modelUpdateHandler) Run(ctx context.Context, task *model.SystemTask, runne
 		finishSystemTaskHandler(task, runnerID, model.SystemTaskStatusFailed, nil, err)
 		return
 	}
-	summary := runChannelUpstreamModelUpdateTaskOnce(ctx, payload.Manual, !payload.Manual, service.NewSystemTaskProgressReporter(task, runnerID))
+	scope := model.DataScope{All: true}
+	if payload.Restrict {
+		scope = model.DataScope{IDs: payload.ChannelIDs}
+	}
+	summary := runChannelUpstreamModelUpdateTaskOnce(ctx, payload.Manual, !payload.Manual, service.NewSystemTaskProgressReporter(task, runnerID), scope)
 	finishSystemTaskHandler(task, runnerID, model.SystemTaskStatusSucceeded, summary, nil)
 }
 

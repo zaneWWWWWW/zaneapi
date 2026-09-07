@@ -995,7 +995,7 @@ func performChannelTests(ctx context.Context, channels []*model.Channel, testUse
 // trigger passes ChannelTestModeScheduledAll to test every channel. When notify
 // is set the root user is notified on completion. Cross-instance execution is
 // guarded by the system task per-type lock, so no process-local guard is needed.
-func runChannelTestTask(ctx context.Context, mode string, notify bool, report func(processed, total int)) (channelTestSummary, error) {
+func runChannelTestTask(ctx context.Context, payload channelTestTaskPayload, report func(processed, total int)) (channelTestSummary, error) {
 	testUserID, err := resolveChannelTestUserID(nil)
 	if err != nil {
 		return channelTestSummary{}, err
@@ -1004,13 +1004,17 @@ func runChannelTestTask(ctx context.Context, mode string, notify bool, report fu
 	if err != nil {
 		return channelTestSummary{}, err
 	}
+	mode := payload.Mode
 	if strings.TrimSpace(mode) == "" {
 		mode = operation_setting.GetMonitorSetting().ChannelTestMode
 	}
 	selected := selectChannelsForAutomaticTest(channels, mode)
+	if payload.Restrict {
+		selected = filterChannelsByScope(selected, model.DataScope{IDs: payload.ChannelIDs})
+	}
 	allowDisable := mode != operation_setting.ChannelTestModePassiveRecovery
 	summary := performChannelTests(ctx, selected, testUserID, allowDisable, report)
-	if notify && (ctx == nil || ctx.Err() == nil) {
+	if payload.Notify && (ctx == nil || ctx.Err() == nil) {
 		service.NotifyRootUser(dto.NotifyTypeChannelTest, "通道测试完成", "所有通道测试已完成")
 	}
 	return summary, nil
@@ -1034,10 +1038,16 @@ func selectChannelsForAutomaticTest(channels []*model.Channel, mode string) []*m
 // test loop inline. If any channel_test task is already active, the manual run is
 // rejected so the caller does not mistake a scheduled run for this manual one.
 func TestAllChannels(c *gin.Context) {
-	task, created, err := service.EnqueueSystemTask(model.SystemTaskTypeChannelTest, channelTestTaskPayload{
+	payload := channelTestTaskPayload{
 		Mode:   operation_setting.ChannelTestModeScheduledAll,
 		Notify: true,
-	})
+	}
+	scope := currentChannelScope(c)
+	if !scope.All {
+		payload.Restrict = true
+		payload.ChannelIDs = append([]int(nil), scope.IDs...)
+	}
+	task, created, err := service.EnqueueSystemTask(model.SystemTaskTypeChannelTest, payload)
 	if err != nil {
 		common.ApiError(c, err)
 		return

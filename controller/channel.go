@@ -87,14 +87,14 @@ func applyChannelStatusFilter(query *gorm.DB, statusFilter int) *gorm.DB {
 	return query
 }
 
-func buildChannelListQuery(group string, statusFilter int, typeFilter int) *gorm.DB {
+func buildChannelListQuery(c *gin.Context, group string, statusFilter int, typeFilter int) *gorm.DB {
 	query := model.DB.Model(&model.Channel{})
 	query = model.ApplyChannelGroupFilter(query, group)
 	query = applyChannelStatusFilter(query, statusFilter)
 	if typeFilter >= 0 {
 		query = query.Where("type = ?", typeFilter)
 	}
-	return query
+	return model.ApplyIDScope(query, "id", currentChannelScope(c))
 }
 
 func GetChannelOps(c *gin.Context) {
@@ -104,13 +104,23 @@ func GetChannelOps(c *gin.Context) {
 }
 
 func GetChannelNames(c *gin.Context) {
-	names, err := model.GetAllChannelNames()
+	names, err := model.GetAllChannelNamesInScope(currentChannelScope(c))
 	if err != nil {
 		common.SysError("failed to get channel names: " + err.Error())
 		c.JSON(http.StatusOK, gin.H{"success": false, "message": "获取渠道名称失败，请稍后重试"})
 		return
 	}
 	common.ApiSuccess(c, names)
+}
+
+func GetChannelOptions(c *gin.Context) {
+	options, err := model.GetChannelOptions(currentChannelScope(c))
+	if err != nil {
+		common.SysError("failed to get channel options: " + err.Error())
+		c.JSON(http.StatusOK, gin.H{"success": false, "message": "获取渠道列表失败，请稍后重试"})
+		return
+	}
+	common.ApiSuccess(c, options)
 }
 
 func GetAllChannels(c *gin.Context) {
@@ -135,13 +145,13 @@ func GetAllChannels(c *gin.Context) {
 	var total int64
 
 	if enableTagMode {
-		tags, err := model.GetPaginatedChannelTags(buildChannelListQuery(groupFilter, statusFilter, typeFilter), pageInfo.GetStartIdx(), pageInfo.GetPageSize())
+		tags, err := model.GetPaginatedChannelTags(buildChannelListQuery(c, groupFilter, statusFilter, typeFilter), pageInfo.GetStartIdx(), pageInfo.GetPageSize())
 		if err != nil {
 			common.SysError("failed to get paginated tags: " + err.Error())
 			c.JSON(http.StatusOK, gin.H{"success": false, "message": "获取标签失败，请稍后重试"})
 			return
 		}
-		total, err = model.CountChannelTags(buildChannelListQuery(groupFilter, statusFilter, typeFilter))
+		total, err = model.CountChannelTags(buildChannelListQuery(c, groupFilter, statusFilter, typeFilter))
 		if err != nil {
 			common.SysError("failed to count tags: " + err.Error())
 			c.JSON(http.StatusOK, gin.H{"success": false, "message": "获取标签数量失败，请稍后重试"})
@@ -152,7 +162,7 @@ func GetAllChannels(c *gin.Context) {
 				continue
 			}
 			var tagChannels []*model.Channel
-			err := sortOptions.Apply(buildChannelListQuery(groupFilter, statusFilter, typeFilter).Where("tag = ?", *tag)).
+			err := sortOptions.Apply(buildChannelListQuery(c, groupFilter, statusFilter, typeFilter).Where("tag = ?", *tag)).
 				Omit("key").
 				Find(&tagChannels).Error
 			if err != nil {
@@ -163,13 +173,13 @@ func GetAllChannels(c *gin.Context) {
 			channelData = append(channelData, tagChannels...)
 		}
 	} else {
-		if err := buildChannelListQuery(groupFilter, statusFilter, typeFilter).Count(&total).Error; err != nil {
+		if err := buildChannelListQuery(c, groupFilter, statusFilter, typeFilter).Count(&total).Error; err != nil {
 			common.SysError("failed to count channels: " + err.Error())
 			c.JSON(http.StatusOK, gin.H{"success": false, "message": "获取渠道数量失败，请稍后重试"})
 			return
 		}
 
-		err := sortOptions.Apply(buildChannelListQuery(groupFilter, statusFilter, typeFilter)).
+		err := sortOptions.Apply(buildChannelListQuery(c, groupFilter, statusFilter, typeFilter)).
 			Limit(pageInfo.GetPageSize()).
 			Offset(pageInfo.GetStartIdx()).
 			Omit("key").
@@ -186,7 +196,7 @@ func GetAllChannels(c *gin.Context) {
 		clearChannelProfitConfig(datum, c.GetInt("role"))
 	}
 
-	countQuery := buildChannelListQuery(groupFilter, statusFilter, -1)
+	countQuery := buildChannelListQuery(c, groupFilter, statusFilter, -1)
 	var results []struct {
 		Type  int64
 		Count int64
@@ -274,7 +284,7 @@ func FetchUpstreamModels(c *gin.Context) {
 }
 
 func FixChannelsAbilities(c *gin.Context) {
-	success, fails, err := model.FixAbility()
+	success, fails, err := model.FixAbilityInScope(currentChannelScope(c))
 	if err != nil {
 		common.ApiError(c, err)
 		return
@@ -311,7 +321,7 @@ func SearchChannels(c *gin.Context) {
 		for _, tag := range tags {
 			if tag != nil && *tag != "" {
 				var tagChannels []*model.Channel
-				err := sortOptions.Apply(buildChannelListQuery(group, -1, -1).Where("tag = ?", *tag)).
+				err := sortOptions.Apply(buildChannelListQuery(c, group, -1, -1).Where("tag = ?", *tag)).
 					Omit("key").
 					Find(&tagChannels).Error
 				if err != nil {
@@ -335,6 +345,8 @@ func SearchChannels(c *gin.Context) {
 		}
 		channelData = channels
 	}
+
+	channelData = filterChannelsByScope(channelData, currentChannelScope(c))
 
 	if statusFilter == common.ChannelStatusEnabled || statusFilter == 0 {
 		filtered := make([]*model.Channel, 0, len(channelData))
@@ -416,6 +428,9 @@ func GetChannel(c *gin.Context) {
 	id, err := strconv.Atoi(c.Param("id"))
 	if err != nil {
 		common.ApiError(c, err)
+		return
+	}
+	if abortIfChannelOutOfScope(c, id) {
 		return
 	}
 	channel, err := model.GetChannelById(id, false)
@@ -718,8 +733,12 @@ func AddChannel(c *gin.Context) {
 		}
 		channels = append(channels, *localChannel)
 	}
-	err = model.BatchInsertChannels(channels)
+	createdIDs, err := model.BatchInsertChannels(channels)
 	if err != nil {
+		common.ApiError(c, err)
+		return
+	}
+	if err := assignCreatedChannels(c, createdIDs); err != nil {
 		common.ApiError(c, err)
 		return
 	}
@@ -770,7 +789,7 @@ func DeleteChannel(c *gin.Context) {
 }
 
 func DeleteDisabledChannel(c *gin.Context) {
-	rows, err := model.DeleteDisabledChannel()
+	rows, err := model.DeleteDisabledChannelInScope(currentChannelScope(c))
 	if err != nil {
 		common.ApiError(c, err)
 		return
@@ -812,7 +831,7 @@ func DisableTagChannels(c *gin.Context) {
 		})
 		return
 	}
-	err = model.DisableChannelByTag(channelTag.Tag)
+	err = model.DisableChannelByTag(channelTag.Tag, currentChannelScope(c))
 	if err != nil {
 		common.ApiError(c, err)
 		return
@@ -838,7 +857,7 @@ func EnableTagChannels(c *gin.Context) {
 		})
 		return
 	}
-	err = model.EnableChannelByTag(channelTag.Tag)
+	err = model.EnableChannelByTag(channelTag.Tag, currentChannelScope(c))
 	if err != nil {
 		common.ApiError(c, err)
 		return
@@ -898,7 +917,7 @@ func EditTagChannels(c *gin.Context) {
 		}
 		channelTag.HeaderOverride = common.GetPointer[string](trimmed)
 	}
-	err = model.EditChannelByTag(channelTag.Tag, channelTag.NewTag, channelTag.ModelMapping, channelTag.Models, channelTag.Groups, channelTag.Priority, channelTag.Weight, channelTag.ParamOverride, channelTag.HeaderOverride)
+	err = model.EditChannelByTag(channelTag.Tag, channelTag.NewTag, channelTag.ModelMapping, channelTag.Models, channelTag.Groups, channelTag.Priority, channelTag.Weight, channelTag.ParamOverride, channelTag.HeaderOverride, currentChannelScope(c))
 	if err != nil {
 		common.ApiError(c, err)
 		return
@@ -927,6 +946,9 @@ func DeleteChannelBatch(c *gin.Context) {
 			"success": false,
 			"message": "参数错误",
 		})
+		return
+	}
+	if abortIfAnyChannelOutOfScope(c, channelBatch.Ids) {
 		return
 	}
 	deletedCount, err := model.BatchDeleteChannels(channelBatch.Ids)
@@ -986,6 +1008,9 @@ func UpdateChannel(c *gin.Context) {
 	}
 	if _, ok := requestData["cost_ratio"]; ok && c.GetInt("role") != common.RoleRootUser {
 		common.ApiErrorI18n(c, i18n.MsgAuthInsufficientPrivilege)
+		return
+	}
+	if abortIfChannelOutOfScope(c, channel.Id) {
 		return
 	}
 	clearChannelReadOnlyFields(&channel, requestData)
@@ -1198,6 +1223,9 @@ func BatchUpdateChannelStatus(c *gin.Context) {
 	req := ChannelStatusBatchRequest{}
 	if err := c.ShouldBindJSON(&req); err != nil || len(req.Ids) == 0 || !isManageableChannelStatus(req.Status) {
 		common.ApiErrorI18n(c, i18n.MsgInvalidParams)
+		return
+	}
+	if abortIfAnyChannelOutOfScope(c, req.Ids) {
 		return
 	}
 	changedCount := 0
@@ -1415,6 +1443,9 @@ func BatchSetChannelTag(c *gin.Context) {
 		})
 		return
 	}
+	if abortIfAnyChannelOutOfScope(c, channelBatch.Ids) {
+		return
+	}
 	err = model.BatchSetChannelTag(channelBatch.Ids, channelBatch.Tag)
 	if err != nil {
 		common.ApiError(c, err)
@@ -1450,6 +1481,7 @@ func GetTagModels(c *gin.Context) {
 		})
 		return
 	}
+	channels = filterChannelsByScope(channels, currentChannelScope(c))
 
 	var longestModels string
 	maxLength := 0
@@ -1483,6 +1515,9 @@ func CopyChannel(c *gin.Context) {
 	id, err := strconv.Atoi(c.Param("id"))
 	if err != nil {
 		c.JSON(http.StatusOK, gin.H{"success": false, "message": "invalid id"})
+		return
+	}
+	if abortIfChannelOutOfScope(c, id) {
 		return
 	}
 
@@ -1527,6 +1562,10 @@ func CopyChannel(c *gin.Context) {
 	if err := clone.Insert(); err != nil {
 		common.SysError("failed to clone channel: " + err.Error())
 		c.JSON(http.StatusOK, gin.H{"success": false, "message": "复制渠道失败，请稍后重试"})
+		return
+	}
+	if err := assignCreatedChannels(c, []int{clone.Id}); err != nil {
+		common.ApiError(c, err)
 		return
 	}
 	model.InitChannelCache()
@@ -1576,6 +1615,9 @@ func ManageMultiKeys(c *gin.Context) {
 	err := c.ShouldBindJSON(&request)
 	if err != nil {
 		common.ApiError(c, err)
+		return
+	}
+	if abortIfChannelOutOfScope(c, request.ChannelId) {
 		return
 	}
 
@@ -2070,6 +2112,9 @@ func OllamaPullModel(c *gin.Context) {
 		})
 		return
 	}
+	if abortIfChannelOutOfScope(c, req.ChannelID) {
+		return
+	}
 
 	// 获取渠道信息
 	channel, err := model.GetChannelById(req.ChannelID, true)
@@ -2131,6 +2176,9 @@ func OllamaPullModelStream(c *gin.Context) {
 			"success": false,
 			"message": "Channel ID and model name are required",
 		})
+		return
+	}
+	if abortIfChannelOutOfScope(c, req.ChannelID) {
 		return
 	}
 
@@ -2213,6 +2261,9 @@ func OllamaDeleteModel(c *gin.Context) {
 			"success": false,
 			"message": "Channel ID and model name are required",
 		})
+		return
+	}
+	if abortIfChannelOutOfScope(c, req.ChannelID) {
 		return
 	}
 

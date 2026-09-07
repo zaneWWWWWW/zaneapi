@@ -18,7 +18,7 @@ type permissionRoute struct {
 
 func registerChannelRoutes(apiRouter *gin.RouterGroup) {
 	channelRoute := apiRouter.Group("/channel")
-	channelRoute.Use(middleware.AdminAuth())
+	channelRoute.Use(middleware.AdminAuth(), middleware.RequireChannelInScope())
 
 	channelRoute.POST("/:id/key",
 		middleware.RootAuth(),
@@ -40,6 +40,7 @@ func registerChannelRoutes(apiRouter *gin.RouterGroup) {
 var channelPermissionRoutes = []permissionRoute{
 	{method: http.MethodGet, path: "/", permission: authz.ChannelRead, handler: controller.GetAllChannels},
 	{method: http.MethodGet, path: "/names", permission: authz.ChannelRead, handler: controller.GetChannelNames},
+	{method: http.MethodGet, path: "/options", permission: authz.ChannelRead, handler: controller.GetChannelOptions},
 	{method: http.MethodGet, path: "/search", permission: authz.ChannelRead, handler: controller.SearchChannels},
 	{method: http.MethodGet, path: "/models", permission: authz.ChannelRead, handler: controller.ChannelListModels},
 	{method: http.MethodGet, path: "/models_enabled", permission: authz.ChannelRead, handler: controller.EnabledListModels},

@@ -48,9 +48,13 @@ func GetGroupEnabledModels(group string) []string {
 }
 
 func GetEnabledModels() []string {
+	return GetEnabledModelsInScope(DataScope{All: true})
+}
+
+func GetEnabledModelsInScope(scope DataScope) []string {
 	var models []string
-	// Find distinct models
-	DB.Table("abilities").Where("enabled = ?", true).Distinct("model").Pluck("model", &models)
+	query := ApplyIDScope(DB.Table("abilities").Where("enabled = ?", true), "channel_id", scope)
+	query.Distinct("model").Pluck("model", &models)
 	return models
 }
 
@@ -314,11 +318,12 @@ func UpdateAbilityStatus(channelId int, status bool) error {
 	return DB.Model(&Ability{}).Where("channel_id = ?", channelId).Select("enabled").Update("enabled", status).Error
 }
 
-func UpdateAbilityStatusByTag(tag string, status bool) error {
-	return DB.Model(&Ability{}).Where("tag = ?", tag).Select("enabled").Update("enabled", status).Error
+func UpdateAbilityStatusByTag(tag string, status bool, scope DataScope) error {
+	return ApplyIDScope(DB.Model(&Ability{}).Where("tag = ?", tag), "channel_id", scope).
+		Select("enabled").Update("enabled", status).Error
 }
 
-func UpdateAbilityByTag(tag string, newTag *string, priority *int64, weight *uint) error {
+func UpdateAbilityByTag(tag string, newTag *string, priority *int64, weight *uint, scope DataScope) error {
 	ability := Ability{}
 	if newTag != nil {
 		ability.Tag = newTag
@@ -329,35 +334,39 @@ func UpdateAbilityByTag(tag string, newTag *string, priority *int64, weight *uin
 	if weight != nil {
 		ability.Weight = *weight
 	}
-	return DB.Model(&Ability{}).Where("tag = ?", tag).Updates(ability).Error
+	return ApplyIDScope(DB.Model(&Ability{}).Where("tag = ?", tag), "channel_id", scope).Updates(ability).Error
 }
 
 var fixLock = sync.Mutex{}
 
 func FixAbility() (int, int, error) {
+	return FixAbilityInScope(DataScope{All: true})
+}
+
+func FixAbilityInScope(scope DataScope) (int, int, error) {
 	lock := fixLock.TryLock()
 	if !lock {
 		return 0, 0, errors.New("已经有一个修复任务在运行中，请稍后再试")
 	}
 	defer fixLock.Unlock()
 
-	// truncate abilities table
-	if common.UsingMainDatabase(common.DatabaseTypeSQLite) {
-		err := DB.Exec("DELETE FROM abilities").Error
-		if err != nil {
-			common.SysLog(fmt.Sprintf("Delete abilities failed: %s", err.Error()))
-			return 0, 0, err
-		}
-	} else {
-		err := DB.Exec("TRUNCATE TABLE abilities").Error
-		if err != nil {
-			common.SysLog(fmt.Sprintf("Truncate abilities failed: %s", err.Error()))
-			return 0, 0, err
+	if scope.All {
+		if common.UsingMainDatabase(common.DatabaseTypeSQLite) {
+			err := DB.Exec("DELETE FROM abilities").Error
+			if err != nil {
+				common.SysLog(fmt.Sprintf("Delete abilities failed: %s", err.Error()))
+				return 0, 0, err
+			}
+		} else {
+			err := DB.Exec("TRUNCATE TABLE abilities").Error
+			if err != nil {
+				common.SysLog(fmt.Sprintf("Truncate abilities failed: %s", err.Error()))
+				return 0, 0, err
+			}
 		}
 	}
 	var channels []*Channel
-	// Find all channels
-	err := DB.Model(&Channel{}).Find(&channels).Error
+	err := ApplyIDScope(DB.Model(&Channel{}), "id", scope).Find(&channels).Error
 	if err != nil {
 		return 0, 0, err
 	}

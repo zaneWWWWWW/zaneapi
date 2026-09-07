@@ -326,7 +326,7 @@ func Register(c *gin.Context) {
 func GetAllUsers(c *gin.Context) {
 	pageInfo := common.GetPageQuery(c)
 	sortOptions := model.NewUserSortOptions(c.Query("sort_by"), c.Query("sort_order"))
-	users, total, err := model.GetAllUsers(pageInfo, sortOptions)
+	users, total, err := model.GetAllUsers(pageInfo, currentUserScope(c), sortOptions)
 	if err != nil {
 		common.ApiError(c, err)
 		return
@@ -356,7 +356,7 @@ func SearchUsers(c *gin.Context) {
 	}
 	pageInfo := common.GetPageQuery(c)
 	sortOptions := model.NewUserSortOptions(c.Query("sort_by"), c.Query("sort_order"))
-	users, total, err := model.SearchUsers(keyword, group, role, status, pageInfo.GetStartIdx(), pageInfo.GetPageSize(), sortOptions)
+	users, total, err := model.SearchUsers(keyword, group, role, status, pageInfo.GetStartIdx(), pageInfo.GetPageSize(), currentUserScope(c), sortOptions)
 	if err != nil {
 		common.ApiError(c, err)
 		return
@@ -388,7 +388,14 @@ func GetUser(c *gin.Context) {
 		common.ApiErrorI18n(c, i18n.MsgUserNoPermissionSameLevel)
 		return
 	}
+	if abortIfUserOutOfScope(c, user.Id) {
+		return
+	}
 	user.AdminPermissions = authz.Capabilities(user.Id, user.Role)
+	if myRole == common.RoleRootUser {
+		scopes := model.GetAdminScopesPayload(user.Id)
+		user.AdminScopes = &scopes
+	}
 	c.JSON(http.StatusOK, gin.H{
 		"success": true,
 		"message": "",
@@ -705,6 +712,9 @@ func UpdateUser(c *gin.Context) {
 		common.ApiErrorI18n(c, i18n.MsgUserNoPermissionHigherLevel)
 		return
 	}
+	if abortIfUserOutOfScope(c, originUser.Id) {
+		return
+	}
 	if updatedUser.Password == "$I_LOVE_U" {
 		updatedUser.Password = "" // rollback to what it should be
 	}
@@ -716,7 +726,10 @@ func UpdateUser(c *gin.Context) {
 		}
 		touched, err := updateAdminPermissionsForUserInTx(c, tx, updatedUser.Id, originUser.Role, updatedUser.AdminPermissions)
 		authzTouched = touched
-		return err
+		if err != nil {
+			return err
+		}
+		return updateAdminScopesForUserInTx(c, tx, updatedUser.Id, originUser.Role, updatedUser.AdminScopes, false)
 	}); err != nil {
 		common.ApiError(c, err)
 		return
@@ -972,6 +985,9 @@ func DeleteUser(c *gin.Context) {
 		common.ApiErrorI18n(c, i18n.MsgUserNoPermissionHigherLevel)
 		return
 	}
+	if abortIfUserOutOfScope(c, originUser.Id) {
+		return
+	}
 	err = model.HardDeleteUserById(id)
 	if err != nil {
 		common.ApiError(c, err)
@@ -1043,7 +1059,13 @@ func CreateUser(c *gin.Context) {
 		}
 		touched, err := updateAdminPermissionsForUserInTx(c, tx, cleanUser.Id, cleanUser.Role, user.AdminPermissions)
 		authzTouched = touched
-		return err
+		if err != nil {
+			return err
+		}
+		if err := updateAdminScopesForUserInTx(c, tx, cleanUser.Id, cleanUser.Role, user.AdminScopes, true); err != nil {
+			return err
+		}
+		return authz.AssignCreatedUserInTx(tx, c.GetInt("id"), c.GetInt("role"), cleanUser.Id)
 	}); err != nil {
 		common.ApiError(c, err)
 		return
@@ -1111,6 +1133,9 @@ func ManageUser(c *gin.Context) {
 	myRole := c.GetInt("role")
 	if !canManageTargetRole(myRole, user.Role) {
 		common.ApiErrorI18n(c, i18n.MsgUserNoPermissionHigherLevel)
+		return
+	}
+	if abortIfUserOutOfScope(c, user.Id) {
 		return
 	}
 	switch req.Action {
@@ -1223,12 +1248,18 @@ func ManageUser(c *gin.Context) {
 		return
 	}
 
-	if req.Action == "demote" {
+	if req.Action == "demote" || req.Action == "promote" {
 		if err := model.DB.Transaction(func(tx *gorm.DB) error {
 			if err := user.UpdateWithTx(tx, false); err != nil {
 				return err
 			}
-			return authz.ClearUserAuthorizationInTx(tx, user.Id)
+			if req.Action == "demote" {
+				if err := authz.ClearUserAuthorizationInTx(tx, user.Id); err != nil {
+					return err
+				}
+				return model.ClearAdminScopesInTx(tx, user.Id)
+			}
+			return updateAdminScopesForUserInTx(c, tx, user.Id, user.Role, nil, true)
 		}); err != nil {
 			common.ApiError(c, err)
 			return

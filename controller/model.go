@@ -320,7 +320,7 @@ func DashboardListModels(c *gin.Context) {
 func EnabledListModels(c *gin.Context) {
 	c.JSON(200, gin.H{
 		"success": true,
-		"data":    model.GetEnabledModels(),
+		"data":    model.GetEnabledModelsInScope(currentChannelScope(c)),
 	})
 }
 

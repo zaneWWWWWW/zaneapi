@@ -452,10 +452,15 @@ func UpdateChannelBalance(c *gin.Context) {
 }
 
 func updateAllChannelsBalance() error {
+	return updateChannelsBalance(model.DataScope{All: true})
+}
+
+func updateChannelsBalance(scope model.DataScope) error {
 	channels, err := model.GetAllChannels(0, 0, true, false)
 	if err != nil {
 		return err
 	}
+	channels = filterChannelsByScope(channels, scope)
 	for _, channel := range channels {
 		if channel.Status != common.ChannelStatusEnabled {
 			continue
@@ -483,7 +488,7 @@ func updateAllChannelsBalance() error {
 
 func UpdateAllChannelsBalance(c *gin.Context) {
 	// TODO: make it async
-	err := updateAllChannelsBalance()
+	err := updateChannelsBalance(currentChannelScope(c))
 	if err != nil {
 		common.ApiError(c, err)
 		return

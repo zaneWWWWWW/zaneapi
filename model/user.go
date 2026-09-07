@@ -110,6 +110,7 @@ type User struct {
 	LastLoginAt      int64                      `json:"last_login_at" gorm:"default:0;column:last_login_at"`
 	AuthVersion      int64                      `json:"-" gorm:"type:bigint;not null;default:1;column:auth_version"`
 	AdminPermissions map[string]map[string]bool `json:"admin_permissions,omitempty" gorm:"-:all"`
+	AdminScopes      *AdminScopesPayload        `json:"admin_scopes,omitempty" gorm:"-:all"`
 }
 
 func (user *User) ToBaseUser() *UserBase {
@@ -346,7 +347,7 @@ func GetMaxUserId() int {
 	return user.Id
 }
 
-func GetAllUsers(pageInfo *common.PageInfo, sortOptions ...UserSortOptions) (users []*User, total int64, err error) {
+func GetAllUsers(pageInfo *common.PageInfo, scope DataScope, sortOptions ...UserSortOptions) (users []*User, total int64, err error) {
 	// Start transaction
 	tx := DB.Begin()
 	if tx.Error != nil {
@@ -358,8 +359,8 @@ func GetAllUsers(pageInfo *common.PageInfo, sortOptions ...UserSortOptions) (use
 		}
 	}()
 
-	// Get total count within transaction
-	err = tx.Unscoped().Model(&User{}).Count(&total).Error
+	countQuery := ApplyIDScope(tx.Unscoped().Model(&User{}), "id", scope)
+	err = countQuery.Count(&total).Error
 	if err != nil {
 		tx.Rollback()
 		return nil, 0, err
@@ -367,7 +368,7 @@ func GetAllUsers(pageInfo *common.PageInfo, sortOptions ...UserSortOptions) (use
 
 	// Get paginated users within same transaction
 	order := resolveUserSortOptions(sortOptions)
-	err = order.Apply(tx.Unscoped()).Limit(pageInfo.GetPageSize()).Offset(pageInfo.GetStartIdx()).Omit("password", "access_token").Find(&users).Error
+	err = order.Apply(ApplyIDScope(tx.Unscoped(), "id", scope)).Limit(pageInfo.GetPageSize()).Offset(pageInfo.GetStartIdx()).Omit("password", "access_token").Find(&users).Error
 	if err != nil {
 		tx.Rollback()
 		return nil, 0, err
@@ -381,7 +382,7 @@ func GetAllUsers(pageInfo *common.PageInfo, sortOptions ...UserSortOptions) (use
 	return users, total, nil
 }
 
-func SearchUsers(keyword string, group string, role *int, status *int, startIdx int, num int, sortOptions ...UserSortOptions) ([]*User, int64, error) {
+func SearchUsers(keyword string, group string, role *int, status *int, startIdx int, num int, scope DataScope, sortOptions ...UserSortOptions) ([]*User, int64, error) {
 	var users []*User
 	var total int64
 	var err error
@@ -412,6 +413,7 @@ func SearchUsers(keyword string, group string, role *int, status *int, startIdx 
 		likeArgs = append([]interface{}{keywordInt}, likeArgs...)
 	}
 
+	query = ApplyIDScope(query, "id", scope)
 	query = query.Where("("+likeCondition+")", likeArgs...)
 	if group != "" {
 		query = query.Where(commonGroupCol+" = ?", group)

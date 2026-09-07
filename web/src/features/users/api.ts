@@ -30,6 +30,11 @@ import type {
   ApiResponse,
 } from './types'
 
+export interface ChannelScopeOption {
+  id: number
+  name: string
+}
+
 // ============================================================================
 // User Management APIs
 // ============================================================================
@@ -84,6 +89,13 @@ export async function searchUsers(
 /**
  * Get single user by ID
  */
+export async function getChannelScopeOptions(): Promise<
+  ApiResponse<ChannelScopeOption[]>
+> {
+  const res = await api.get('/api/channel/options')
+  return res.data
+}
+
 export async function getUser(id: number): Promise<ApiResponse<User>> {
   const res = await api.get(`/api/user/${id}`)
   return res.data

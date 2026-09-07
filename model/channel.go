@@ -380,9 +380,27 @@ func GetAllChannels(startIdx int, num int, selectAll bool, idSort bool, sortOpti
 }
 
 func GetAllChannelNames() ([]string, error) {
+	return GetAllChannelNamesInScope(DataScope{All: true})
+}
+
+func GetAllChannelNamesInScope(scope DataScope) ([]string, error) {
 	var names []string
-	err := DB.Model(&Channel{}).Select("name").Order("id ASC").Find(&names).Error
+	err := ApplyIDScope(DB.Model(&Channel{}), "id", scope).Select("name").Order("id ASC").Find(&names).Error
 	return names, err
+}
+
+type ChannelOption struct {
+	Id   int    `json:"id"`
+	Name string `json:"name"`
+}
+
+func GetChannelOptions(scope DataScope) ([]ChannelOption, error) {
+	options := make([]ChannelOption, 0)
+	err := ApplyIDScope(DB.Model(&Channel{}), "id", scope).
+		Select("id, name").
+		Order("id ASC").
+		Find(&options).Error
+	return options, err
 }
 
 func GetChannelsByTag(tag string, idSort bool, selectAll bool, sortOptions ...ChannelSortOptions) ([]*Channel, error) {
@@ -443,13 +461,13 @@ func GetChannelById(id int, selectAll bool) (*Channel, error) {
 	return channel, nil
 }
 
-func BatchInsertChannels(channels []Channel) error {
+func BatchInsertChannels(channels []Channel) ([]int, error) {
 	if len(channels) == 0 {
-		return nil
+		return nil, nil
 	}
 	tx := DB.Begin()
 	if tx.Error != nil {
-		return tx.Error
+		return nil, tx.Error
 	}
 	defer func() {
 		if r := recover(); r != nil {
@@ -457,19 +475,24 @@ func BatchInsertChannels(channels []Channel) error {
 		}
 	}()
 
+	ids := make([]int, 0, len(channels))
 	for _, chunk := range lo.Chunk(channels, 50) {
 		if err := tx.Create(&chunk).Error; err != nil {
 			tx.Rollback()
-			return err
+			return nil, err
 		}
 		for _, channel_ := range chunk {
 			if err := channel_.AddAbilities(tx); err != nil {
 				tx.Rollback()
-				return err
+				return nil, err
 			}
+			ids = append(ids, channel_.Id)
 		}
 	}
-	return tx.Commit().Error
+	if err := tx.Commit().Error; err != nil {
+		return nil, err
+	}
+	return ids, nil
 }
 
 func BatchDeleteChannels(ids []int) (int64, error) {
@@ -804,25 +827,25 @@ func UpdateChannelStatus(channelId int, usingKey string, status int, reason stri
 	return true
 }
 
-func EnableChannelByTag(tag string) error {
-	err := DB.Model(&Channel{}).Where("tag = ?", tag).Update("status", common.ChannelStatusEnabled).Error
+func EnableChannelByTag(tag string, scope DataScope) error {
+	err := ApplyIDScope(DB.Model(&Channel{}).Where("tag = ?", tag), "id", scope).
+		Update("status", common.ChannelStatusEnabled).Error
 	if err != nil {
 		return err
 	}
-	err = UpdateAbilityStatusByTag(tag, true)
-	return err
+	return UpdateAbilityStatusByTag(tag, true, scope)
 }
 
-func DisableChannelByTag(tag string) error {
-	err := DB.Model(&Channel{}).Where("tag = ?", tag).Update("status", common.ChannelStatusManuallyDisabled).Error
+func DisableChannelByTag(tag string, scope DataScope) error {
+	err := ApplyIDScope(DB.Model(&Channel{}).Where("tag = ?", tag), "id", scope).
+		Update("status", common.ChannelStatusManuallyDisabled).Error
 	if err != nil {
 		return err
 	}
-	err = UpdateAbilityStatusByTag(tag, false)
-	return err
+	return UpdateAbilityStatusByTag(tag, false, scope)
 }
 
-func EditChannelByTag(tag string, newTag *string, modelMapping *string, models *string, group *string, priority *int64, weight *uint, paramOverride *string, headerOverride *string) error {
+func EditChannelByTag(tag string, newTag *string, modelMapping *string, models *string, group *string, priority *int64, weight *uint, paramOverride *string, headerOverride *string, scope DataScope) error {
 	updateData := Channel{}
 	shouldReCreateAbilities := false
 	updatedTag := tag
@@ -855,7 +878,7 @@ func EditChannelByTag(tag string, newTag *string, modelMapping *string, models *
 		updateData.HeaderOverride = headerOverride
 	}
 
-	err := DB.Model(&Channel{}).Where("tag = ?", tag).Updates(updateData).Error
+	err := ApplyIDScope(DB.Model(&Channel{}).Where("tag = ?", tag), "id", scope).Updates(updateData).Error
 	if err != nil {
 		return err
 	}
@@ -863,6 +886,9 @@ func EditChannelByTag(tag string, newTag *string, modelMapping *string, models *
 		channels, err := GetChannelsByTag(updatedTag, false, false)
 		if err == nil {
 			for _, channel := range channels {
+				if !scope.Allows(channel.Id) {
+					continue
+				}
 				err = channel.UpdateAbilities(nil)
 				if err != nil {
 					common.SysLog(fmt.Sprintf("failed to update abilities: channel_id=%d, tag=%s, error=%v", channel.Id, channel.GetTag(), err))
@@ -870,7 +896,7 @@ func EditChannelByTag(tag string, newTag *string, modelMapping *string, models *
 			}
 		}
 	} else {
-		err := UpdateAbilityByTag(tag, newTag, priority, weight)
+		err := UpdateAbilityByTag(tag, newTag, priority, weight, scope)
 		if err != nil {
 			return err
 		}
@@ -899,7 +925,15 @@ func DeleteChannelByStatus(status int64) (int64, error) {
 }
 
 func DeleteDisabledChannel() (int64, error) {
-	result := DB.Where("status = ? or status = ?", common.ChannelStatusAutoDisabled, common.ChannelStatusManuallyDisabled).Delete(&Channel{})
+	return DeleteDisabledChannelInScope(DataScope{All: true})
+}
+
+func DeleteDisabledChannelInScope(scope DataScope) (int64, error) {
+	result := ApplyIDScope(
+		DB.Where("status = ? or status = ?", common.ChannelStatusAutoDisabled, common.ChannelStatusManuallyDisabled),
+		"id",
+		scope,
+	).Delete(&Channel{})
 	return result.RowsAffected, result.Error
 }
 

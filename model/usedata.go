@@ -172,24 +172,31 @@ func GetQuotaDataByUserId(userId int, startTime int64, endTime int64) (quotaData
 	return quotaDatas, err
 }
 
-func GetQuotaDataGroupByUser(startTime int64, endTime int64) (quotaData []*QuotaData, err error) {
+func GetQuotaDataGroupByUser(startTime int64, endTime int64, userScope DataScope) (quotaData []*QuotaData, err error) {
 	var quotaDatas []*QuotaData
-	err = DB.Table("quota_data").
+	query := ApplyIDScope(DB.Table("quota_data"), "user_id", userScope).
 		Select("username, created_at, sum(count) as count, sum(quota) as quota, sum(token_used) as token_used").
 		Where("created_at >= ? and created_at <= ?", startTime, endTime).
-		Group("username, created_at").
-		Find(&quotaDatas).Error
+		Group("username, created_at")
+	err = query.Find(&quotaDatas).Error
 	return quotaDatas, err
 }
 
-func GetAllQuotaDates(startTime int64, endTime int64, username string) (quotaData []*QuotaData, err error) {
+func GetAllQuotaDates(startTime int64, endTime int64, username string, userScope DataScope) (quotaData []*QuotaData, err error) {
 	if username != "" {
-		return GetQuotaDataByUsername(username, startTime, endTime)
+		var quotaDatas []*QuotaData
+		query := ApplyIDScope(DB.Table("quota_data"), "user_id", userScope).
+			Select("user_id, username, model_name, created_at, sum(count) as count, sum(quota) as quota, sum(token_used) as token_used").
+			Where("username = ? and created_at >= ? and created_at <= ?", username, startTime, endTime).
+			Group("user_id, username, model_name, created_at")
+		err = query.Find(&quotaDatas).Error
+		return quotaDatas, err
 	}
 	var quotaDatas []*QuotaData
-	// 从quota_data表中查询数据
-	// only select model_name, sum(count) as count, sum(quota) as quota, model_name, created_at from quota_data group by model_name, created_at;
-	//err = DB.Table("quota_data").Where("created_at >= ? and created_at <= ?", startTime, endTime).Find(&quotaDatas).Error
-	err = DB.Table("quota_data").Select("model_name, sum(count) as count, sum(quota) as quota, sum(token_used) as token_used, created_at").Where("created_at >= ? and created_at <= ?", startTime, endTime).Group("model_name, created_at").Find(&quotaDatas).Error
+	query := ApplyIDScope(DB.Table("quota_data"), "user_id", userScope).
+		Select("model_name, sum(count) as count, sum(quota) as quota, sum(token_used) as token_used, created_at").
+		Where("created_at >= ? and created_at <= ?", startTime, endTime).
+		Group("model_name, created_at")
+	err = query.Find(&quotaDatas).Error
 	return quotaDatas, err
 }

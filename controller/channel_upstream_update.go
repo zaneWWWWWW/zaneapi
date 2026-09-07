@@ -670,7 +670,7 @@ type upstreamModelUpdateSummary struct {
 // scheduled job calls (force=false, allowAutoApply=true); the manual "detect
 // all" trigger calls (force=true, allowAutoApply=false) so it always re-checks
 // and only stages changes for explicit review.
-func runChannelUpstreamModelUpdateTaskOnce(ctx context.Context, force bool, allowAutoApply bool, report func(processed, total int)) upstreamModelUpdateSummary {
+func runChannelUpstreamModelUpdateTaskOnce(ctx context.Context, force bool, allowAutoApply bool, report func(processed, total int), scope model.DataScope) upstreamModelUpdateSummary {
 	checkedChannels := 0
 	failedChannels := 0
 	failedChannelIDs := make([]int, 0)
@@ -686,7 +686,7 @@ func runChannelUpstreamModelUpdateTaskOnce(ctx context.Context, force bool, allo
 	// Count the enabled channels up front so progress can be reported as a
 	// percentage; a count error is non-fatal (progress just won't show a %).
 	var totalChannels int64
-	if err := model.DB.Model(&model.Channel{}).Where("status = ?", common.ChannelStatusEnabled).Count(&totalChannels).Error; err != nil {
+	if err := model.ApplyIDScope(model.DB.Model(&model.Channel{}).Where("status = ?", common.ChannelStatusEnabled), "id", scope).Count(&totalChannels).Error; err != nil {
 		totalChannels = 0
 	}
 	processed := 0
@@ -698,9 +698,9 @@ scanLoop:
 			break
 		}
 		var channels []*model.Channel
-		query := model.DB.
+		query := model.ApplyIDScope(model.DB.
 			Select(channelUpstreamModelUpdateSelectFields).
-			Where("status = ?", common.ChannelStatusEnabled).
+			Where("status = ?", common.ChannelStatusEnabled), "id", scope).
 			Order("id asc").
 			Limit(channelUpstreamModelUpdateTaskBatchSize)
 		if lastID > 0 {
@@ -850,6 +850,9 @@ func ApplyChannelUpstreamModelUpdates(c *gin.Context) {
 		})
 		return
 	}
+	if abortIfChannelOutOfScope(c, req.ID) {
+		return
+	}
 
 	channel, err := model.GetChannelById(req.ID, true)
 	if err != nil {
@@ -904,6 +907,9 @@ func DetectChannelUpstreamModelUpdates(c *gin.Context) {
 			"success": false,
 			"message": "invalid channel id",
 		})
+		return
+	}
+	if abortIfChannelOutOfScope(c, req.ID) {
 		return
 	}
 
@@ -991,11 +997,11 @@ func collectPendingApplyUpstreamModelChanges(settings dto.ChannelOtherSettings) 
 	return normalizeModelNames(settings.UpstreamModelUpdateLastDetectedModels), normalizeModelNames(settings.UpstreamModelUpdateLastRemovedModels)
 }
 
-func findEnabledChannelsAfterID(lastID int, batchSize int) ([]*model.Channel, error) {
+func findEnabledChannelsAfterID(lastID int, batchSize int, scope model.DataScope) ([]*model.Channel, error) {
 	var channels []*model.Channel
-	query := model.DB.
+	query := model.ApplyIDScope(model.DB.
 		Select(channelUpstreamModelUpdateSelectFields).
-		Where("status = ?", common.ChannelStatusEnabled).
+		Where("status = ?", common.ChannelStatusEnabled), "id", scope).
 		Order("id asc").
 		Limit(batchSize)
 	if lastID > 0 {
@@ -1013,7 +1019,7 @@ func ApplyAllChannelUpstreamModelUpdates(c *gin.Context) {
 
 	lastID := 0
 	for {
-		channels, err := findEnabledChannelsAfterID(lastID, channelUpstreamModelUpdateTaskBatchSize)
+		channels, err := findEnabledChannelsAfterID(lastID, channelUpstreamModelUpdateTaskBatchSize, currentChannelScope(c))
 		if err != nil {
 			common.ApiError(c, err)
 			return
@@ -1095,7 +1101,13 @@ func ApplyAllChannelUpstreamModelUpdates(c *gin.Context) {
 // manual run is rejected so the caller does not mistake a scheduled run for this
 // manual one.
 func DetectAllChannelUpstreamModelUpdates(c *gin.Context) {
-	task, created, err := service.EnqueueSystemTask(model.SystemTaskTypeModelUpdate, modelUpdateTaskPayload{Manual: true})
+	payload := modelUpdateTaskPayload{Manual: true}
+	scope := currentChannelScope(c)
+	if !scope.All {
+		payload.Restrict = true
+		payload.ChannelIDs = append([]int(nil), scope.IDs...)
+	}
+	task, created, err := service.EnqueueSystemTask(model.SystemTaskTypeModelUpdate, payload)
 	if err != nil {
 		common.ApiError(c, err)
 		return

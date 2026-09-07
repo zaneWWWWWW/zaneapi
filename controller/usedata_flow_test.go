@@ -20,7 +20,8 @@ type flowQuotaResponse struct {
 func setupFlowControllerTestDB(t *testing.T) {
 	t.Helper()
 	db := setupModelListControllerTestDB(t)
-	require.NoError(t, db.AutoMigrate(&model.Token{}, &model.QuotaData{}))
+	require.NoError(t, db.AutoMigrate(&model.Token{}, &model.QuotaData{}, &model.AdminScope{}, &model.AdminScopeItem{}))
+	require.NoError(t, model.DB.Create(&model.AdminScope{UserId: 10, Kind: model.AdminScopeKindUser, Mode: model.AdminScopeModeAll}).Error)
 	require.NoError(t, model.DB.Create(&model.Channel{Id: 1, Name: "east"}).Error)
 	require.NoError(t, model.DB.Create(&model.Token{Id: 11, UserId: 1, Key: "sk-primary", Name: "primary"}).Error)
 	require.NoError(t, model.DB.Create(&model.Token{Id: 22, UserId: 2, Key: "sk-backup", Name: "backup"}).Error)
@@ -66,6 +67,7 @@ func TestGetAllFlowQuotaDatesUsesAdminDimensions(t *testing.T) {
 
 	recorder := httptest.NewRecorder()
 	ctx, _ := gin.CreateTestContext(recorder)
+	ctx.Set("id", 10)
 	ctx.Set("role", common.RoleAdminUser)
 	ctx.Request = httptest.NewRequest(http.MethodGet, "/api/data/flow?start_timestamp=1000&end_timestamp=2000&username=bob", nil)
 

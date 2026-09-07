@@ -20,6 +20,18 @@ import { z } from 'zod'
 
 import type { AdminPermissionMatrix } from '@/lib/admin-permissions'
 
+export type AdminScopeMode = 'all' | 'assigned'
+
+export interface AdminScopeSelection {
+  mode: AdminScopeMode
+  ids: number[]
+}
+
+export interface AdminScopes {
+  channel: AdminScopeSelection
+  user: AdminScopeSelection
+}
+
 // ============================================================================
 // User Schema & Types
 // ============================================================================
@@ -61,6 +73,22 @@ export const userSchema = z.object({
   remark: z.string().optional(),
   admin_permissions: z
     .record(z.string(), z.record(z.string(), z.boolean()))
+    .optional(),
+  admin_scopes: z
+    .object({
+      channel: z
+        .object({
+          mode: z.enum(['all', 'assigned']),
+          ids: z.array(z.number()),
+        })
+        .optional(),
+      user: z
+        .object({
+          mode: z.enum(['all', 'assigned']),
+          ids: z.array(z.number()),
+        })
+        .optional(),
+    })
     .optional(),
 })
 export type User = z.infer<typeof userSchema>
@@ -126,6 +154,7 @@ export interface UserFormData {
   group?: string // Only used when updating user
   remark?: string // Only used when updating user
   admin_permissions?: AdminPermissionMatrix
+  admin_scopes?: AdminScopes
 }
 
 export type ManageUserAction =

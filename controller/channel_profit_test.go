@@ -29,6 +29,11 @@ func setupChannelProfitControllerTest(t *testing.T) *model.Channel {
 		CostRatio: &ratio,
 	}
 	require.NoError(t, db.Create(channel).Error)
+	require.NoError(t, db.Create(&model.AdminScope{
+		UserId: 2,
+		Kind:   model.AdminScopeKindChannel,
+		Mode:   model.AdminScopeModeAll,
+	}).Error)
 	return channel
 }
 
@@ -82,6 +87,7 @@ func TestGetChannelHidesCostRatioFromNonRoot(t *testing.T) {
 
 	recorder := httptest.NewRecorder()
 	ctx, _ := gin.CreateTestContext(recorder)
+	ctx.Set("id", 2)
 	ctx.Set("role", common.RoleAdminUser)
 	ctx.Params = gin.Params{{Key: "id", Value: fmt.Sprintf("%d", channel.Id)}}
 	ctx.Request = httptest.NewRequest(http.MethodGet, "/api/channel/"+fmt.Sprintf("%d", channel.Id), nil)

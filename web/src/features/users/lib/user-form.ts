@@ -27,7 +27,12 @@ import { quotaUnitsToDollars } from '@/lib/format'
 import { ROLE } from '@/lib/roles'
 
 import { DEFAULT_GROUP } from '../constants'
-import { type UserFormData, type User } from '../types'
+import type { UserFormData, User, AdminScopes } from '../types'
+
+export const EMPTY_ADMIN_SCOPES: AdminScopes = {
+  channel: { mode: 'assigned', ids: [] },
+  user: { mode: 'assigned', ids: [] },
+}
 
 // ============================================================================
 // Form Schema
@@ -43,6 +48,18 @@ export const userFormSchema = z.object({
   remark: z.string().optional(),
   admin_permissions: z
     .record(z.string(), z.record(z.string(), z.boolean()))
+    .optional(),
+  admin_scopes: z
+    .object({
+      channel: z.object({
+        mode: z.enum(['all', 'assigned']),
+        ids: z.array(z.number()),
+      }),
+      user: z.object({
+        mode: z.enum(['all', 'assigned']),
+        ids: z.array(z.number()),
+      }),
+    })
     .optional(),
 })
 
@@ -62,6 +79,7 @@ export const USER_FORM_DEFAULT_VALUES: UserFormValues = {
   remark: '',
   // Filled against the backend catalog at render time; see UsersMutateDrawer.
   admin_permissions: {},
+  admin_scopes: EMPTY_ADMIN_SCOPES,
 }
 
 // ============================================================================
@@ -92,6 +110,7 @@ export function transformFormDataToPayload(
       data.admin_permissions as AdminPermissionMatrix | undefined,
       catalog
     )
+    payload.admin_scopes = data.admin_scopes ?? EMPTY_ADMIN_SCOPES
   }
 
   // For create: only send required fields
@@ -122,5 +141,9 @@ export function transformUserToFormDefaults(user: User): UserFormValues {
     group: user.group || DEFAULT_GROUP,
     remark: user.remark || '',
     admin_permissions: user.admin_permissions ?? {},
+    admin_scopes: {
+      channel: user.admin_scopes?.channel ?? EMPTY_ADMIN_SCOPES.channel,
+      user: user.admin_scopes?.user ?? EMPTY_ADMIN_SCOPES.user,
+    },
   }
 }

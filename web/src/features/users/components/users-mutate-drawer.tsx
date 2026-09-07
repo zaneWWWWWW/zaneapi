@@ -19,7 +19,7 @@ For commercial licensing, please contact support@quantumnous.com
 import { zodResolver } from '@hookform/resolvers/zod'
 import { useQuery } from '@tanstack/react-query'
 import { Pencil } from 'lucide-react'
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
@@ -79,8 +79,10 @@ import {
   createUser,
   updateUser,
   getUser,
+  getUsers,
   getGroups,
   getPermissionCatalog,
+  getChannelScopeOptions,
 } from '../api'
 import { BINDING_FIELDS, ERROR_MESSAGES, SUCCESS_MESSAGES } from '../constants'
 import {
@@ -90,7 +92,7 @@ import {
   transformFormDataToPayload,
   transformUserToFormDefaults,
 } from '../lib'
-import type { User } from '../types'
+import type { AdminScopeSelection, User } from '../types'
 import { UserQuotaDialog } from './user-quota-dialog'
 import { useUsers } from './users-provider'
 
@@ -126,6 +128,26 @@ export function UsersMutateDrawer({
     queryKey: ['admin-permission-catalog'],
     queryFn: getPermissionCatalog,
     staleTime: 5 * 60 * 1000,
+  })
+
+  const { data: channelScopeOptions = [] } = useQuery({
+    queryKey: ['admin-scope-channel-options'],
+    queryFn: async () => {
+      const result = await getChannelScopeOptions()
+      return result.success ? (result.data ?? []) : []
+    },
+    enabled: open && currentUser?.role === ROLE.SUPER_ADMIN,
+    staleTime: 60 * 1000,
+  })
+
+  const { data: userScopeOptions = [] } = useQuery({
+    queryKey: ['admin-scope-user-options'],
+    queryFn: async () => {
+      const result = await getUsers({ p: 1, page_size: 200, sort_by: 'id' })
+      return result.success ? (result.data?.items ?? []) : []
+    },
+    enabled: open && currentUser?.role === ROLE.SUPER_ADMIN,
+    staleTime: 60 * 1000,
   })
 
   const form = useForm<UserFormValues>({
@@ -558,6 +580,40 @@ export function UsersMutateDrawer({
                         )
                       }}
                     />
+                    <FormField
+                      control={form.control}
+                      name='admin_scopes.channel'
+                      render={({ field }) => (
+                        <AdminScopePicker
+                          title={t('Visible channels')}
+                          allLabel={t('All channels')}
+                          searchPlaceholder={t('Search channels')}
+                          options={channelScopeOptions.map((channel) => ({
+                            id: channel.id,
+                            label: channel.name,
+                          }))}
+                          value={field.value ?? { mode: 'assigned', ids: [] }}
+                          onChange={field.onChange}
+                        />
+                      )}
+                    />
+                    <FormField
+                      control={form.control}
+                      name='admin_scopes.user'
+                      render={({ field }) => (
+                        <AdminScopePicker
+                          title={t('Visible users')}
+                          allLabel={t('All users')}
+                          searchPlaceholder={t('Search users')}
+                          options={userScopeOptions.map((user) => ({
+                            id: user.id,
+                            label: user.username,
+                          }))}
+                          value={field.value ?? { mode: 'assigned', ids: [] }}
+                          onChange={field.onChange}
+                        />
+                      )}
+                    />
                     {currentUser && (
                       <p className='text-muted-foreground text-xs'>
                         {hasPermission(
@@ -630,5 +686,82 @@ export function UsersMutateDrawer({
         />
       )}
     </>
+  )
+}
+
+function AdminScopePicker({
+  title,
+  allLabel,
+  searchPlaceholder,
+  options,
+  value,
+  onChange,
+}: {
+  title: string
+  allLabel: string
+  searchPlaceholder: string
+  options: { id: number; label: string }[]
+  value: AdminScopeSelection
+  onChange: (next: AdminScopeSelection) => void
+}) {
+  const [keyword, setKeyword] = useState('')
+  const isAll = value.mode === 'all'
+  const selected = new Set(value.ids)
+  const visibleOptions = useMemo(() => {
+    const query = keyword.trim().toLowerCase()
+    if (query === '') return options
+    return options.filter((option) =>
+      option.label.toLowerCase().includes(query)
+    )
+  }, [keyword, options])
+
+  return (
+    <div className='space-y-2 rounded-md border p-3'>
+      <div className='text-sm font-medium'>{title}</div>
+      <label className='flex items-center gap-2 text-sm'>
+        <Checkbox
+          checked={isAll}
+          onCheckedChange={(checked) => {
+            onChange(
+              checked === true
+                ? { mode: 'all', ids: [] }
+                : { mode: 'assigned', ids: value.ids }
+            )
+          }}
+        />
+        {allLabel}
+      </label>
+      {!isAll && (
+        <>
+          <Input
+            value={keyword}
+            onChange={(event) => setKeyword(event.target.value)}
+            placeholder={searchPlaceholder}
+          />
+          <div className='max-h-40 space-y-1 overflow-y-auto'>
+            {visibleOptions.map((option) => (
+              <label
+                key={option.id}
+                className='flex items-center gap-2 text-sm'
+              >
+                <Checkbox
+                  checked={selected.has(option.id)}
+                  onCheckedChange={(checked) => {
+                    const next = new Set(selected)
+                    if (checked === true) {
+                      next.add(option.id)
+                    } else {
+                      next.delete(option.id)
+                    }
+                    onChange({ mode: 'assigned', ids: [...next] })
+                  }}
+                />
+                {option.label}
+              </label>
+            ))}
+          </div>
+        </>
+      )}
+    </div>
   )
 }
