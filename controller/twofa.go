@@ -567,6 +567,9 @@ func AdminDisable2FA(c *gin.Context) {
 		})
 		return
 	}
+	if abortIfUserOutOfScope(c, userId) {
+		return
+	}
 
 	// 禁用2FA
 	if err := model.DisableTwoFAWithAuthVersion(userId); err != nil {

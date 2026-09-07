@@ -505,6 +505,9 @@ func GetUserOAuthBindingsByAdmin(c *gin.Context) {
 		common.ApiErrorMsg(c, "no permission")
 		return
 	}
+	if abortIfUserOutOfScope(c, userId) {
+		return
+	}
 
 	response, err := buildUserOAuthBindingsResponse(userId)
 	if err != nil {
@@ -562,6 +565,9 @@ func UnbindCustomOAuthByAdmin(c *gin.Context) {
 	myRole := c.GetInt("role")
 	if !canManageTargetRole(myRole, targetUser.Role) {
 		common.ApiErrorMsg(c, "no permission")
+		return
+	}
+	if abortIfUserOutOfScope(c, userId) {
 		return
 	}
 

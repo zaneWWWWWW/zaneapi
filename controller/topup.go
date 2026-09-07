@@ -501,10 +501,11 @@ func GetAllTopUps(c *gin.Context) {
 		total  int64
 		err    error
 	)
+	userScope := currentUserScope(c)
 	if keyword != "" {
-		topups, total, err = model.SearchAllTopUps(keyword, pageInfo)
+		topups, total, err = model.SearchAllTopUps(keyword, pageInfo, userScope)
 	} else {
-		topups, total, err = model.GetAllTopUps(pageInfo)
+		topups, total, err = model.GetAllTopUps(pageInfo, userScope)
 	}
 	if err != nil {
 		common.ApiError(c, err)
@@ -525,6 +526,15 @@ func AdminCompleteTopUp(c *gin.Context) {
 	var req AdminCompleteTopupRequest
 	if err := c.ShouldBindJSON(&req); err != nil || req.TradeNo == "" {
 		common.ApiErrorMsg(c, "参数错误")
+		return
+	}
+
+	topUp := model.GetTopUpByTradeNo(req.TradeNo)
+	if topUp == nil {
+		common.ApiErrorMsg(c, "充值订单不存在")
+		return
+	}
+	if abortIfUserOutOfScope(c, topUp.UserId) {
 		return
 	}
 

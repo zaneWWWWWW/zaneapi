@@ -452,6 +452,9 @@ func AdminResetPasskey(c *gin.Context) {
 		common.ApiErrorMsg(c, "no permission")
 		return
 	}
+	if abortIfUserOutOfScope(c, user.Id) {
+		return
+	}
 
 	if _, err := model.GetPasskeyByUserID(user.Id); err != nil {
 		if errors.Is(err, model.ErrPasskeyNotFound) {

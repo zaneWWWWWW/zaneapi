@@ -33,6 +33,15 @@ func abortIfUserOutOfScope(c *gin.Context, userID int) bool {
 	return true
 }
 
+func abortIfSubscriptionOutOfScope(c *gin.Context, subscriptionID int) bool {
+	var sub model.UserSubscription
+	if err := model.DB.Select("id", "user_id").Where("id = ?", subscriptionID).First(&sub).Error; err != nil {
+		common.ApiError(c, err)
+		return true
+	}
+	return abortIfUserOutOfScope(c, sub.UserId)
+}
+
 func filterChannelsByScope(channels []*model.Channel, scope model.DataScope) []*model.Channel {
 	if scope.All {
 		return channels

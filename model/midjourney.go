@@ -1,5 +1,7 @@
 package model
 
+import "gorm.io/gorm"
+
 type Midjourney struct {
 	Id          int    `json:"id"`
 	Code        int    `json:"code"`
@@ -61,26 +63,11 @@ func GetAllUserTask(userId int, startIdx int, num int, queryParams TaskQueryPara
 	return tasks
 }
 
-func GetAllTasks(startIdx int, num int, queryParams TaskQueryParams) []*Midjourney {
+func GetAllTasks(startIdx int, num int, queryParams TaskQueryParams, userScope DataScope) []*Midjourney {
 	var tasks []*Midjourney
 	var err error
 
-	// 初始化查询构建器
-	query := DB
-
-	// 添加过滤条件
-	if queryParams.ChannelID != "" {
-		query = query.Where("channel_id = ?", queryParams.ChannelID)
-	}
-	if queryParams.MjID != "" {
-		query = query.Where("mj_id = ?", queryParams.MjID)
-	}
-	if queryParams.StartTimestamp != "" {
-		query = query.Where("submit_time >= ?", queryParams.StartTimestamp)
-	}
-	if queryParams.EndTimestamp != "" {
-		query = query.Where("submit_time <= ?", queryParams.EndTimestamp)
-	}
+	query := applyMidjourneyAdminQuery(DB, queryParams, userScope)
 
 	// 获取数据
 	err = query.Order("id desc").Limit(num).Offset(startIdx).Find(&tasks).Error
@@ -197,9 +184,13 @@ func MjBulkUpdateByTaskIds(taskIDs []int, params map[string]any) error {
 }
 
 // CountAllTasks returns total midjourney tasks for admin query
-func CountAllTasks(queryParams TaskQueryParams) int64 {
+func CountAllTasks(queryParams TaskQueryParams, userScope DataScope) int64 {
 	var total int64
-	query := DB.Model(&Midjourney{})
+	_ = applyMidjourneyAdminQuery(DB.Model(&Midjourney{}), queryParams, userScope).Count(&total).Error
+	return total
+}
+
+func applyMidjourneyAdminQuery(query *gorm.DB, queryParams TaskQueryParams, userScope DataScope) *gorm.DB {
 	if queryParams.ChannelID != "" {
 		query = query.Where("channel_id = ?", queryParams.ChannelID)
 	}
@@ -212,8 +203,7 @@ func CountAllTasks(queryParams TaskQueryParams) int64 {
 	if queryParams.EndTimestamp != "" {
 		query = query.Where("submit_time <= ?", queryParams.EndTimestamp)
 	}
-	_ = query.Count(&total).Error
-	return total
+	return ApplyIDScope(query, "user_id", userScope)
 }
 
 // CountAllUserTask returns total midjourney tasks for user
