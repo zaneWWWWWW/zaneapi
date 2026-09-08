@@ -73,10 +73,16 @@ function getMargin(summary: ChannelProfitSummary | undefined): string {
 }
 
 function getProfitTimeZone(language: string): string {
-  switch (language) {
-    case 'zhCN':
+  const normalizedLanguage = language.trim().replaceAll('_', '-').toLowerCase()
+  switch (normalizedLanguage) {
+    case 'zhcn':
+    case 'zh-cn':
+    case 'zh':
       return 'Asia/Shanghai'
-    case 'zhTW':
+    case 'zhtw':
+    case 'zh-tw':
+    case 'zh-hk':
+    case 'zh-mo':
       return 'Asia/Taipei'
     case 'ja':
       return 'Asia/Tokyo'
@@ -141,7 +147,9 @@ export function ChannelProfitSheet() {
   const [calendarOpen, setCalendarOpen] = useState(false)
   const range = useMemo(() => {
     if (preset === 'custom' && customRange) return customRange
-    if (preset === 'custom') return getProfitPresetRange('30d', openedAt, timeZone)
+    if (preset === 'custom') {
+      return getProfitPresetRange('30d', openedAt, timeZone)
+    }
     return getProfitPresetRange(preset, openedAt, timeZone)
   }, [customRange, openedAt, preset, timeZone])
   const timeRange = useMemo(
@@ -368,7 +376,8 @@ export function ChannelProfitSheet() {
                     startMonth={new Date(currentYear - 10, 0)}
                     endMonth={new Date(currentYear, 11)}
                     disabled={(date) =>
-                      date > calendarDateInTimeZone(new Date(openedAt), timeZone)
+                      date >
+                      calendarDateInTimeZone(new Date(openedAt), timeZone)
                     }
                     onSelect={applyCalendarRange}
                   />
