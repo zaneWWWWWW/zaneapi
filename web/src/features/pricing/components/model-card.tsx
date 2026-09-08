@@ -30,7 +30,7 @@ import {
   getSquareDynamicPricePairs,
 } from '../lib/dynamic-price'
 import { parseTags } from '../lib/filters'
-import { isTokenBasedModel } from '../lib/model-helpers'
+import { getDisplayGroup, isTokenBasedModel } from '../lib/model-helpers'
 import {
   getSquareRequestPricePair,
   getSquareTokenPricePair,
@@ -95,7 +95,7 @@ export const ModelCard = memo(function ModelCard(props: ModelCardProps) {
     (entry) => entry.field === 'inputPrice' || entry.field === 'outputPrice'
   )
 
-  const primaryGroup = groups[0]
+  const primaryGroup = getDisplayGroup(props.model, props.selectedGroup)
   const bottomTags = [...endpoints.slice(0, 2), ...tags.slice(0, 2)]
   const hiddenCount =
     Math.max(groups.length - 1, 0) +

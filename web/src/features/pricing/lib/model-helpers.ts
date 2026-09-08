@@ -95,6 +95,26 @@ export function getDisplayGroupRatio(
 }
 
 /**
+ * Resolve the group label shown on a model card/table row. It follows the
+ * same selection rules as pricing: an active group is shown when the model is
+ * enabled for it; otherwise the first enabled group is used as a fallback.
+ */
+export function getDisplayGroup(
+  model: PricingModel,
+  selectedGroup?: string
+): string | undefined {
+  const groups = Array.isArray(model.enable_groups) ? model.enable_groups : []
+  if (
+    selectedGroup &&
+    selectedGroup !== FILTER_ALL &&
+    groups.includes(selectedGroup)
+  ) {
+    return selectedGroup
+  }
+  return groups[0]
+}
+
+/**
  * Replace model placeholder in endpoint path
  */
 export function replaceModelInPath(path: string, modelName: string): string {
