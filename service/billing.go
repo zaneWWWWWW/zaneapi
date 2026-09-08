@@ -54,6 +54,7 @@ func SettleBilling(ctx *gin.Context, relayInfo *relaycommon.RelayInfo, actualQuo
 	}
 	if relayInfo.Billing != nil {
 		preConsumed := relayInfo.Billing.GetPreConsumedQuota()
+		relayInfo.ProfitRevenueQuota = &preConsumed
 		delta := actualQuota - preConsumed
 
 		if delta > 0 {
@@ -74,8 +75,15 @@ func SettleBilling(ctx *gin.Context, relayInfo *relaycommon.RelayInfo, actualQuo
 			))
 		}
 
-		if err := relayInfo.Billing.Settle(actualQuota); err != nil {
-			return err
+		settleErr := relayInfo.Billing.Settle(actualQuota)
+		if funded, ok := relayInfo.Billing.(interface{ FundedQuota() int }); ok {
+			committed := funded.FundedQuota()
+			relayInfo.ProfitRevenueQuota = &committed
+		} else if settleErr == nil {
+			relayInfo.ProfitRevenueQuota = &actualQuota
+		}
+		if settleErr != nil {
+			return settleErr
 		}
 
 		// 发送额度通知（订阅计费使用订阅剩余额度）
@@ -90,6 +98,8 @@ func SettleBilling(ctx *gin.Context, relayInfo *relaycommon.RelayInfo, actualQuo
 	}
 
 	// 回退：无 BillingSession 时使用旧路径
+	revenue := relayInfo.FinalPreConsumedQuota
+	relayInfo.ProfitRevenueQuota = &revenue
 	quotaDelta := actualQuota - relayInfo.FinalPreConsumedQuota
 	if quotaDelta != 0 {
 		return PostConsumeQuota(relayInfo, quotaDelta, relayInfo.FinalPreConsumedQuota, true)

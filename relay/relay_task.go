@@ -196,6 +196,7 @@ func RelayTaskSubmit(c *gin.Context, info *relaycommon.RelayInfo) (*TaskSubmitRe
 
 	// 6. 将 OtherRatios 应用到基础额度（饱和转换，防止溢出成负数）
 	if !common.StringsContains(constant.TaskPricePatches, modelName) {
+		info.PriceData.BaseQuota = info.PriceData.ApplyOtherRatiosToFloat(info.PriceData.BaseQuota)
 		quotaWithRatios := info.PriceData.ApplyOtherRatiosToFloat(float64(info.PriceData.Quota))
 		quota, clamp := common.QuotaFromFloatChecked(quotaWithRatios)
 		info.PriceData.Quota = quota
@@ -243,9 +244,11 @@ func RelayTaskSubmit(c *gin.Context, info *relaycommon.RelayInfo) (*TaskSubmitRe
 	finalQuota := info.PriceData.Quota
 	if adjustedRatios := adaptor.AdjustBillingOnSubmit(info, taskData); len(adjustedRatios) > 0 {
 		if adjustedQuota, ok := recalcQuotaFromRatios(info, adjustedRatios); ok {
+			baseQuota := info.PriceData.RemoveOtherRatiosFromFloat(info.PriceData.BaseQuota)
 			// 基于调整后的 ratios 重新计算 quota
 			finalQuota = adjustedQuota
 			info.PriceData.ReplaceOtherRatios(adjustedRatios)
+			info.PriceData.BaseQuota = info.PriceData.ApplyOtherRatiosToFloat(baseQuota)
 			info.PriceData.Quota = finalQuota
 		}
 	}

@@ -73,7 +73,7 @@ func clearChannelInfo(channel *model.Channel) {
 
 func clearChannelProfitConfig(channel *model.Channel, role int) {
 	if role != common.RoleRootUser {
-		channel.CostRatio = nil
+		channel.UpstreamRatio = nil
 	}
 }
 
@@ -649,7 +649,7 @@ func AddChannel(c *gin.Context) {
 		common.ApiError(c, err)
 		return
 	}
-	if addChannelRequest.Channel != nil && addChannelRequest.Channel.CostRatio != nil && c.GetInt("role") != common.RoleRootUser {
+	if addChannelRequest.Channel != nil && addChannelRequest.Channel.UpstreamRatio != nil && c.GetInt("role") != common.RoleRootUser {
 		common.ApiErrorI18n(c, i18n.MsgAuthInsufficientPrivilege)
 		return
 	}
@@ -1006,7 +1006,7 @@ func UpdateChannel(c *gin.Context) {
 		common.ApiErrorI18n(c, i18n.MsgInvalidParams)
 		return
 	}
-	if _, ok := requestData["cost_ratio"]; ok && c.GetInt("role") != common.RoleRootUser {
+	if _, ok := requestData["upstream_ratio"]; ok && c.GetInt("role") != common.RoleRootUser {
 		common.ApiErrorI18n(c, i18n.MsgAuthInsufficientPrivilege)
 		return
 	}
@@ -1045,11 +1045,11 @@ func UpdateChannel(c *gin.Context) {
 	// Profit configuration is root-only and must survive ordinary channel edits
 	// whose payloads intentionally omit it. GORM struct Updates skip nil
 	// pointers, so an explicit null from root has to be written separately.
-	clearCostRatio := false
-	if _, provided := requestData["cost_ratio"]; !provided {
-		channel.CostRatio = originChannel.CostRatio
-	} else if channel.CostRatio == nil {
-		clearCostRatio = true
+	clearUpstreamRatio := false
+	if _, provided := requestData["upstream_ratio"]; !provided {
+		channel.UpstreamRatio = originChannel.UpstreamRatio
+	} else if channel.UpstreamRatio == nil {
+		clearUpstreamRatio = true
 	}
 
 	if channelHasSensitiveChanges(&channel, originChannel, requestData) &&
@@ -1148,12 +1148,12 @@ func UpdateChannel(c *gin.Context) {
 		common.ApiError(c, err)
 		return
 	}
-	if clearCostRatio {
-		if err := model.DB.Model(&model.Channel{}).Where("id = ?", channel.Id).Update("cost_ratio", nil).Error; err != nil {
+	if clearUpstreamRatio {
+		if err := model.DB.Model(&model.Channel{}).Where("id = ?", channel.Id).Update("upstream_ratio", nil).Error; err != nil {
 			common.ApiError(c, err)
 			return
 		}
-		channel.CostRatio = nil
+		channel.UpstreamRatio = nil
 	}
 	model.InitChannelCache()
 	if proxyChanged {
@@ -1549,7 +1549,7 @@ func CopyChannel(c *gin.Context) {
 		clone.UsedQuota = 0
 	}
 	if c.GetInt("role") != common.RoleRootUser {
-		clone.CostRatio = nil
+		clone.UpstreamRatio = nil
 	}
 
 	if err := clone.ValidateSettings(); err != nil {

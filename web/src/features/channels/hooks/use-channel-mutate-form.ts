@@ -54,7 +54,7 @@ const SENSITIVE_UPDATE_FIELDS = [
   'setting',
   'settings',
   'other',
-  'cost_ratio',
+  'upstream_ratio',
 ] satisfies (keyof Channel)[]
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -108,7 +108,7 @@ export function useChannelMutateForm(props: UseChannelMutateFormParams) {
           }
         }
         if (!canEditProfitSettings) {
-          delete payload.cost_ratio
+          delete payload.upstream_ratio
         }
         const payloadWithKeyMode =
           canEditSensitive &&
@@ -133,7 +133,7 @@ export function useChannelMutateForm(props: UseChannelMutateFormParams) {
 
       const payload = transformFormDataToCreatePayload(data)
       if (!canEditProfitSettings) {
-        delete payload.channel.cost_ratio
+        delete payload.channel.upstream_ratio
       }
       const response = await createChannel(payload)
       if (!response.success) {

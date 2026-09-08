@@ -9,6 +9,7 @@ import (
 
 	"github.com/QuantumNous/new-api/common"
 	"github.com/QuantumNous/new-api/model"
+	"github.com/QuantumNous/new-api/types"
 	"github.com/gin-gonic/gin"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -21,12 +22,12 @@ func setupChannelProfitControllerTest(t *testing.T) *model.Channel {
 
 	ratio := 0.72
 	channel := &model.Channel{
-		Name:      "profit-sec-channel",
-		Type:      1,
-		Key:       "test-key",
-		Models:    "gpt-test",
-		Group:     "default",
-		CostRatio: &ratio,
+		Name:          "profit-sec-channel",
+		Type:          1,
+		Key:           "test-key",
+		Models:        "gpt-test",
+		Group:         "default",
+		UpstreamRatio: &ratio,
 	}
 	require.NoError(t, db.Create(channel).Error)
 	require.NoError(t, db.Create(&model.AdminScope{
@@ -58,7 +59,7 @@ func TestGetChannelProfitRejectsInvalidTimestamps(t *testing.T) {
 
 func TestGetChannelProfitReturnsConfiguredReport(t *testing.T) {
 	channel := setupChannelProfitControllerTest(t)
-	model.RecordChannelProfit("sec-consume", channel.Id, "gpt-test", 1000, 100)
+	model.RecordChannelProfit("sec-consume", channel.Id, "gpt-test", 1000, 100, types.ProfitBasis{BaseQuota: 1000, GroupRatio: 1, UpstreamRatio: channel.UpstreamRatio})
 
 	recorder := httptest.NewRecorder()
 	ctx, _ := gin.CreateTestContext(recorder)
@@ -82,7 +83,7 @@ func TestGetChannelProfitReturnsConfiguredReport(t *testing.T) {
 	assert.Equal(t, int64(280), payload.Data.ProfitQuota)
 }
 
-func TestGetChannelHidesCostRatioFromNonRoot(t *testing.T) {
+func TestGetChannelHidesUpstreamRatioFromNonRoot(t *testing.T) {
 	channel := setupChannelProfitControllerTest(t)
 
 	recorder := httptest.NewRecorder()
@@ -96,15 +97,15 @@ func TestGetChannelHidesCostRatioFromNonRoot(t *testing.T) {
 	var payload struct {
 		Success bool `json:"success"`
 		Data    struct {
-			CostRatio *float64 `json:"cost_ratio"`
+			UpstreamRatio *float64 `json:"upstream_ratio"`
 		} `json:"data"`
 	}
 	require.NoError(t, common.Unmarshal(recorder.Body.Bytes(), &payload))
 	require.True(t, payload.Success)
-	assert.Nil(t, payload.Data.CostRatio)
+	assert.Nil(t, payload.Data.UpstreamRatio)
 }
 
-func TestUpdateChannelDoesNotLeakOrOverwriteCostRatioForAdmin(t *testing.T) {
+func TestUpdateChannelDoesNotLeakOrOverwriteUpstreamRatioForAdmin(t *testing.T) {
 	channel := setupChannelProfitControllerTest(t)
 	body := fmt.Sprintf(`{"id":%d,"name":"profit-sec-channel-renamed"}`, channel.Id)
 
@@ -119,24 +120,24 @@ func TestUpdateChannelDoesNotLeakOrOverwriteCostRatioForAdmin(t *testing.T) {
 	var payload struct {
 		Success bool `json:"success"`
 		Data    struct {
-			Name      string   `json:"name"`
-			CostRatio *float64 `json:"cost_ratio"`
+			Name          string   `json:"name"`
+			UpstreamRatio *float64 `json:"upstream_ratio"`
 		} `json:"data"`
 	}
 	require.NoError(t, common.Unmarshal(recorder.Body.Bytes(), &payload), recorder.Body.String())
 	require.True(t, payload.Success, recorder.Body.String())
 	assert.Equal(t, "profit-sec-channel-renamed", payload.Data.Name)
-	assert.Nil(t, payload.Data.CostRatio)
+	assert.Nil(t, payload.Data.UpstreamRatio)
 
 	var stored model.Channel
-	require.NoError(t, model.DB.Select("cost_ratio", "name").First(&stored, channel.Id).Error)
-	require.NotNil(t, stored.CostRatio)
-	assert.Equal(t, 0.72, *stored.CostRatio)
+	require.NoError(t, model.DB.Select("upstream_ratio", "name").First(&stored, channel.Id).Error)
+	require.NotNil(t, stored.UpstreamRatio)
+	assert.Equal(t, 0.72, *stored.UpstreamRatio)
 }
 
-func TestUpdateChannelRejectsNonRootCostRatioWrite(t *testing.T) {
+func TestUpdateChannelRejectsNonRootUpstreamRatioWrite(t *testing.T) {
 	channel := setupChannelProfitControllerTest(t)
-	body := fmt.Sprintf(`{"id":%d,"name":"profit-sec-channel","cost_ratio":0.1}`, channel.Id)
+	body := fmt.Sprintf(`{"id":%d,"name":"profit-sec-channel","upstream_ratio":0.1}`, channel.Id)
 
 	recorder := httptest.NewRecorder()
 	ctx, _ := gin.CreateTestContext(recorder)
@@ -148,14 +149,14 @@ func TestUpdateChannelRejectsNonRootCostRatioWrite(t *testing.T) {
 
 	assert.Contains(t, recorder.Body.String(), "auth.insufficient_privilege")
 	var stored model.Channel
-	require.NoError(t, model.DB.Select("cost_ratio").First(&stored, channel.Id).Error)
-	require.NotNil(t, stored.CostRatio)
-	assert.Equal(t, 0.72, *stored.CostRatio)
+	require.NoError(t, model.DB.Select("upstream_ratio").First(&stored, channel.Id).Error)
+	require.NotNil(t, stored.UpstreamRatio)
+	assert.Equal(t, 0.72, *stored.UpstreamRatio)
 }
 
-func TestUpdateChannelRootCanClearCostRatio(t *testing.T) {
+func TestUpdateChannelRootCanClearUpstreamRatio(t *testing.T) {
 	channel := setupChannelProfitControllerTest(t)
-	body := fmt.Sprintf(`{"id":%d,"name":"profit-sec-channel","cost_ratio":null}`, channel.Id)
+	body := fmt.Sprintf(`{"id":%d,"name":"profit-sec-channel","upstream_ratio":null}`, channel.Id)
 
 	recorder := httptest.NewRecorder()
 	ctx, _ := gin.CreateTestContext(recorder)
@@ -168,16 +169,16 @@ func TestUpdateChannelRootCanClearCostRatio(t *testing.T) {
 	var payload struct {
 		Success bool `json:"success"`
 		Data    struct {
-			CostRatio *float64 `json:"cost_ratio"`
+			UpstreamRatio *float64 `json:"upstream_ratio"`
 		} `json:"data"`
 	}
 	require.NoError(t, common.Unmarshal(recorder.Body.Bytes(), &payload), recorder.Body.String())
 	require.True(t, payload.Success, recorder.Body.String())
-	assert.Nil(t, payload.Data.CostRatio)
+	assert.Nil(t, payload.Data.UpstreamRatio)
 
 	var stored model.Channel
-	require.NoError(t, model.DB.Select("cost_ratio").First(&stored, channel.Id).Error)
-	assert.Nil(t, stored.CostRatio)
+	require.NoError(t, model.DB.Select("upstream_ratio").First(&stored, channel.Id).Error)
+	assert.Nil(t, stored.UpstreamRatio)
 }
 
 func TestAddChannelNilChannelDoesNotPanic(t *testing.T) {
@@ -193,9 +194,9 @@ func TestAddChannelNilChannelDoesNotPanic(t *testing.T) {
 	assert.Contains(t, recorder.Body.String(), "channel cannot be empty")
 }
 
-func TestAddChannelRejectsNonRootCostRatioBeforeValidation(t *testing.T) {
+func TestAddChannelRejectsNonRootUpstreamRatioBeforeValidation(t *testing.T) {
 	setupChannelProfitControllerTest(t)
-	body := `{"mode":"single","channel":{"name":"admin-create","type":1,"key":"k","models":"gpt-test","group":"default","cost_ratio":9}}`
+	body := `{"mode":"single","channel":{"name":"admin-create","type":1,"key":"k","models":"gpt-test","group":"default","upstream_ratio":9}}`
 
 	recorder := httptest.NewRecorder()
 	ctx, _ := gin.CreateTestContext(recorder)
@@ -209,7 +210,7 @@ func TestAddChannelRejectsNonRootCostRatioBeforeValidation(t *testing.T) {
 	assert.NotContains(t, recorder.Body.String(), "cost ratio must be between")
 }
 
-func TestCopyChannelOmitsCostRatioForNonRoot(t *testing.T) {
+func TestCopyChannelOmitsUpstreamRatioForNonRoot(t *testing.T) {
 	channel := setupChannelProfitControllerTest(t)
 	recorder := httptest.NewRecorder()
 	ctx, _ := gin.CreateTestContext(recorder)
@@ -229,11 +230,11 @@ func TestCopyChannelOmitsCostRatioForNonRoot(t *testing.T) {
 	require.True(t, payload.Success, recorder.Body.String())
 
 	var clone model.Channel
-	require.NoError(t, model.DB.Select("cost_ratio").First(&clone, payload.Data.Id).Error)
-	assert.Nil(t, clone.CostRatio)
+	require.NoError(t, model.DB.Select("upstream_ratio").First(&clone, payload.Data.Id).Error)
+	assert.Nil(t, clone.UpstreamRatio)
 }
 
-func TestCopyChannelKeepsCostRatioForRoot(t *testing.T) {
+func TestCopyChannelKeepsUpstreamRatioForRoot(t *testing.T) {
 	channel := setupChannelProfitControllerTest(t)
 	recorder := httptest.NewRecorder()
 	ctx, _ := gin.CreateTestContext(recorder)
@@ -253,7 +254,7 @@ func TestCopyChannelKeepsCostRatioForRoot(t *testing.T) {
 	require.True(t, payload.Success, recorder.Body.String())
 
 	var clone model.Channel
-	require.NoError(t, model.DB.Select("cost_ratio").First(&clone, payload.Data.Id).Error)
-	require.NotNil(t, clone.CostRatio)
-	assert.Equal(t, 0.72, *clone.CostRatio)
+	require.NoError(t, model.DB.Select("upstream_ratio").First(&clone, payload.Data.Id).Error)
+	require.NotNil(t, clone.UpstreamRatio)
+	assert.Equal(t, 0.72, *clone.UpstreamRatio)
 }

@@ -71,6 +71,7 @@ type ChannelMeta struct {
 	ApiKey               string
 	Organization         string
 	ChannelCreateTime    int64
+	UpstreamRatio        *float64
 	ParamOverride        map[string]interface{}
 	HeadersOverride      map[string]interface{}
 	ChannelSetting       dto.ChannelSettings
@@ -83,6 +84,12 @@ type ChannelMeta struct {
 type TokenCountMeta struct {
 	//promptTokens int
 	estimatePromptTokens int
+}
+
+func channelUpstreamRatio(c *gin.Context) *float64 {
+	value, _ := c.Get("channel_upstream_ratio")
+	ratio, _ := value.(*float64)
+	return ratio
 }
 
 type RelayInfo struct {
@@ -159,6 +166,9 @@ type RelayInfo struct {
 	UpstreamRequestBodySize int64
 
 	PriceData types.PriceData
+	// ProfitRevenueQuota is the amount actually committed to the funding source,
+	// independent of the requested settlement or token-accounting errors.
+	ProfitRevenueQuota *int
 
 	// QuotaClamp is set (non-nil) when a quota conversion saturated at the
 	// int32 bound (or NaN fallback) while computing this request's charge.
@@ -206,6 +216,7 @@ func (info *RelayInfo) InitChannelMeta(c *gin.Context) {
 		ApiKey:               common.GetContextKeyString(c, constant.ContextKeyChannelKey),
 		Organization:         c.GetString("channel_organization"),
 		ChannelCreateTime:    c.GetInt64("channel_create_time"),
+		UpstreamRatio:        channelUpstreamRatio(c),
 		ParamOverride:        paramOverride,
 		HeadersOverride:      headerOverride,
 		UpstreamModelName:    common.GetContextKeyString(c, constant.ContextKeyOriginalModel),

@@ -68,33 +68,8 @@ function ProfitMetric(props: { label: string; value: string }) {
 }
 
 function getMargin(summary: ChannelProfitSummary | undefined): string {
-  if (!summary || summary.revenue_quota === 0) return '-'
+  if (!summary || summary.revenue_quota === 0) return '—'
   return formatPercent((summary.profit_quota / summary.revenue_quota) * 100)
-}
-
-function getProfitTimeZone(language: string): string {
-  const normalizedLanguage = language.trim().replaceAll('_', '-').toLowerCase()
-  switch (normalizedLanguage) {
-    case 'zhcn':
-    case 'zh-cn':
-    case 'zh':
-      return 'Asia/Shanghai'
-    case 'zhtw':
-    case 'zh-tw':
-    case 'zh-hk':
-    case 'zh-mo':
-      return 'Asia/Taipei'
-    case 'ja':
-      return 'Asia/Tokyo'
-    case 'vi':
-      return 'Asia/Ho_Chi_Minh'
-    case 'fr':
-      return 'Europe/Paris'
-    case 'ru':
-      return 'Europe/Moscow'
-    default:
-      return 'UTC'
-  }
 }
 
 function calendarDateInTimeZone(instant: Date, timeZone: string): Date {
@@ -139,7 +114,7 @@ function getProfitPresetRange(
 
 export function ChannelProfitSheet() {
   const { t, i18n } = useTranslation()
-  const timeZone = getProfitTimeZone(i18n.language)
+  const timeZone = 'Asia/Shanghai'
   const [open, setOpen] = useState(false)
   const [openedAt, setOpenedAt] = useState(() => Date.now())
   const [preset, setPreset] = useState<ProfitPreset>('30d')
@@ -231,7 +206,7 @@ export function ChannelProfitSheet() {
         {report && report.unconfigured_channel_count > 0 ? (
           <p className='text-muted-foreground mt-3 text-sm'>
             {t(
-              '{{count}} enabled channels have no cost ratio and are omitted from profit accounting.',
+              '{{count}} enabled channels have no upstream ratio and are omitted from profit accounting.',
               {
                 count: report.unconfigured_channel_count,
               }
@@ -240,6 +215,11 @@ export function ChannelProfitSheet() {
         ) : null}
 
         <div className='mt-4 border'>
+          <p className='text-muted-foreground p-3 text-xs'>
+            {t(
+              'Gross profit uses standard model cost and the upstream ratio. Reports use Beijing time and exclude legacy cost-share records.'
+            )}
+          </p>
           <Table>
             <TableHeader>
               <TableRow>

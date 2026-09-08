@@ -271,6 +271,7 @@ func migrateDB() error {
 	err := DB.AutoMigrate(
 		&Channel{},
 		&ChannelProfitRecord{},
+		&ChannelProfitSettlement{},
 		&Token{},
 		&User{},
 		&UserSession{},
@@ -309,6 +310,9 @@ func migrateDB() error {
 	if err != nil {
 		return err
 	}
+	if err := migrateChannelProfitSchema(DB); err != nil {
+		return err
+	}
 	if err := InitializeUserAuthVersions(); err != nil {
 		return err
 	}
@@ -337,6 +341,7 @@ func migrateDBFast() error {
 	}{
 		{&Channel{}, "Channel"},
 		{&ChannelProfitRecord{}, "ChannelProfitRecord"},
+		{&ChannelProfitSettlement{}, "ChannelProfitSettlement"},
 		{&Token{}, "Token"},
 		{&User{}, "User"},
 		{&UserSession{}, "UserSession"},
@@ -392,6 +397,9 @@ func migrateDBFast() error {
 		if err != nil {
 			return err
 		}
+	}
+	if err := migrateChannelProfitSchema(DB); err != nil {
+		return err
 	}
 	if err := InitializeUserAuthVersions(); err != nil {
 		return err

@@ -47,13 +47,17 @@ func hasCustomModelRatio(modelName string, currentRatio float64) bool {
 }
 
 func calculateAudioQuota(info QuotaInfo) (int, *common.QuotaClamp) {
+	return common.QuotaFromDecimalChecked(calculateAudioCharge(info))
+}
+
+func calculateAudioCharge(info QuotaInfo) decimal.Decimal {
 	if info.UsePrice {
 		modelPrice := decimal.NewFromFloat(info.ModelPrice)
 		quotaPerUnit := decimal.NewFromFloat(common.QuotaPerUnit)
 		groupRatio := decimal.NewFromFloat(info.GroupRatio)
 
 		quota := modelPrice.Mul(quotaPerUnit).Mul(groupRatio)
-		return common.QuotaFromDecimalChecked(quota)
+		return quota
 	}
 
 	completionRatio := decimal.NewFromFloat(ratio_setting.GetCompletionRatio(info.ModelName))
@@ -82,7 +86,7 @@ func calculateAudioQuota(info QuotaInfo) (int, *common.QuotaClamp) {
 		quota = decimal.NewFromInt(1)
 	}
 
-	return common.QuotaFromDecimalChecked(quota)
+	return quota
 }
 
 func PreWssConsumeQuota(ctx *gin.Context, relayInfo *relaycommon.RelayInfo, usage *dto.RealtimeUsage) error {
@@ -202,6 +206,16 @@ func PostWssConsumeQuota(ctx *gin.Context, relayInfo *relaycommon.RelayInfo, mod
 	if tieredOk {
 		quota = tieredQuota
 	}
+	standardQuotaInfo := quotaInfo
+	standardQuotaInfo.GroupRatio = 1
+	baseQuota := calculateAudioCharge(standardQuotaInfo).InexactFloat64()
+	if tieredOk {
+		if tieredResult != nil {
+			baseQuota = tieredResult.ActualQuotaBeforeGroup
+		} else {
+			baseQuota = relayInfo.TieredBillingSnapshot.EstimatedQuotaBeforeGroup
+		}
+	}
 
 	totalTokens := usage.TotalTokens
 	var logContent string
@@ -217,6 +231,7 @@ func PostWssConsumeQuota(ctx *gin.Context, relayInfo *relaycommon.RelayInfo, mod
 		// in this case, must be some error happened
 		// we cannot just return, because we may have to return the pre-consumed quota
 		quota = 0
+		baseQuota = 0
 		logContent += "（可能是上游超时）"
 		logger.LogError(ctx, fmt.Sprintf("total tokens is 0, cannot consume quota, userId %d, channelId %d, "+
 			"tokenId %d, model %s， pre-consumed quota %d", relayInfo.UserId, relayInfo.ChannelId, relayInfo.TokenId, modelName, relayInfo.FinalPreConsumedQuota))
@@ -240,6 +255,7 @@ func PostWssConsumeQuota(ctx *gin.Context, relayInfo *relaycommon.RelayInfo, mod
 	}
 	attachQuotaSaturation(ctx, relayInfo, other)
 	model.RecordConsumeLog(ctx, relayInfo.UserId, model.RecordConsumeLogParams{
+		ProfitBasis:      ProfitBasis(relayInfo, baseQuota),
 		ChannelId:        relayInfo.ChannelId,
 		PromptTokens:     usage.InputTokens,
 		CompletionTokens: usage.OutputTokens,
@@ -320,6 +336,16 @@ func PostAudioConsumeQuota(ctx *gin.Context, relayInfo *relaycommon.RelayInfo, u
 		GroupRatio: groupRatio,
 	}
 
+	standardQuotaInfo := quotaInfo
+	standardQuotaInfo.GroupRatio = 1
+	baseQuota := calculateAudioCharge(standardQuotaInfo).InexactFloat64()
+	if tieredOk {
+		if tieredResult != nil {
+			baseQuota = tieredResult.ActualQuotaBeforeGroup
+		} else {
+			baseQuota = relayInfo.TieredBillingSnapshot.EstimatedQuotaBeforeGroup
+		}
+	}
 	quota, clamp := calculateAudioQuota(quotaInfo)
 	noteQuotaClamp(relayInfo, clamp)
 	if tieredOk {
@@ -340,6 +366,7 @@ func PostAudioConsumeQuota(ctx *gin.Context, relayInfo *relaycommon.RelayInfo, u
 		// in this case, must be some error happened
 		// we cannot just return, because we may have to return the pre-consumed quota
 		quota = 0
+		baseQuota = 0
 		logContent += "（可能是上游超时）"
 		logger.LogError(ctx, fmt.Sprintf("total tokens is 0, cannot consume quota, userId %d, channelId %d, "+
 			"tokenId %d, model %s， pre-consumed quota %d", relayInfo.UserId, relayInfo.ChannelId, relayInfo.TokenId, relayInfo.OriginModelName, relayInfo.FinalPreConsumedQuota))
@@ -363,6 +390,7 @@ func PostAudioConsumeQuota(ctx *gin.Context, relayInfo *relaycommon.RelayInfo, u
 	}
 	attachQuotaSaturation(ctx, relayInfo, other)
 	model.RecordConsumeLog(ctx, relayInfo.UserId, model.RecordConsumeLogParams{
+		ProfitBasis:      ProfitBasis(relayInfo, baseQuota),
 		ChannelId:        relayInfo.ChannelId,
 		PromptTokens:     usage.PromptTokens,
 		CompletionTokens: usage.CompletionTokens,
@@ -420,6 +448,8 @@ func PostConsumeQuota(relayInfo *relaycommon.RelayInfo, quota int, preConsumedQu
 		}
 	}
 
+	committedRevenue := preConsumedQuota + quota
+	relayInfo.ProfitRevenueQuota = &committedRevenue
 	if !relayInfo.IsPlayground && !relayInfo.TokenUnlimited {
 		if quota > 0 {
 			err = model.DecreaseTokenQuota(relayInfo.TokenId, relayInfo.TokenKey, quota)
@@ -435,15 +465,20 @@ func PostConsumeQuota(relayInfo *relaycommon.RelayInfo, quota int, preConsumedQu
 						common.SysLog("error rolling back subscription quota after token settlement failed: " + rollbackErr.Error())
 					} else {
 						relayInfo.SubscriptionPostDelta -= int64(quota)
+						relayInfo.ProfitRevenueQuota = &preConsumedQuota
 					}
 				}
 			} else if quota > 0 {
 				if rollbackErr := model.IncreaseUserQuota(relayInfo.UserId, quota, true); rollbackErr != nil {
 					common.SysLog("error rolling back wallet quota after token settlement failed: " + rollbackErr.Error())
+				} else {
+					relayInfo.ProfitRevenueQuota = &preConsumedQuota
 				}
 			} else {
 				if rollbackErr := model.DecreaseUserQuota(relayInfo.UserId, -quota, false); rollbackErr != nil {
 					common.SysLog("error rolling back wallet refund after token settlement failed: " + rollbackErr.Error())
+				} else {
+					relayInfo.ProfitRevenueQuota = &preConsumedQuota
 				}
 			}
 			return err

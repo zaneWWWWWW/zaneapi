@@ -53,14 +53,16 @@ func LogTaskConsumption(c *gin.Context, info *relaycommon.RelayInfo) {
 	}
 	attachQuotaSaturation(c, info, other)
 	model.RecordConsumeLog(c, info.UserId, model.RecordConsumeLogParams{
-		ChannelId: info.ChannelId,
-		ModelName: info.OriginModelName,
-		TokenName: tokenName,
-		Quota:     info.PriceData.Quota,
-		Content:   logContent,
-		TokenId:   info.TokenId,
-		Group:     info.UsingGroup,
-		Other:     other,
+		ProfitBasis:    ProfitBasis(info, info.PriceData.BaseQuota),
+		ProfitEventKey: fmt.Sprintf("task:%d:%s", info.ChannelId, info.PublicTaskID),
+		ChannelId:      info.ChannelId,
+		ModelName:      info.OriginModelName,
+		TokenName:      tokenName,
+		Quota:          info.PriceData.Quota,
+		Content:        logContent,
+		TokenId:        info.TokenId,
+		Group:          info.UsingGroup,
+		Other:          other,
 	})
 	model.UpdateUserUsedQuotaAndRequestCount(info.UserId, info.PriceData.Quota)
 	model.UpdateChannelUsedQuota(info.ChannelId, info.PriceData.Quota)
@@ -166,11 +168,11 @@ func taskModelName(task *model.Task) string {
 func RefundTaskQuota(ctx context.Context, task *model.Task, reason string) bool {
 	quota := task.Quota
 	if quota == 0 {
-		return true
+		return adjustTaskFundingAndProfit(ctx, task, 0, 0, 0) == nil
 	}
 
 	// 1. 退还资金来源（钱包或订阅）
-	if err := taskAdjustFunding(task, -quota); err != nil {
+	if err := adjustTaskFundingAndProfit(ctx, task, -quota, 0, 0); err != nil {
 		logger.LogWarn(ctx, fmt.Sprintf("退还资金来源失败 task %s: %s", task.TaskID, err.Error()))
 		return false
 	}
@@ -212,10 +214,20 @@ func RecalculateTaskQuota(ctx context.Context, task *model.Task, actualQuota int
 	if actualQuota <= 0 {
 		return
 	}
+	// Legacy callers only supply a rounded user charge. Do not infer standard
+	// cost from it; polling supplies an independently calculated standard charge.
+	recalculateTaskQuota(ctx, task, actualQuota, -1, reason, clamps...)
+}
+
+func recalculateTaskQuota(ctx context.Context, task *model.Task, actualQuota int, baseQuota float64, reason string, clamps ...*common.QuotaClamp) {
+	if actualQuota < 0 {
+		return
+	}
 	preConsumedQuota := task.Quota
 	quotaDelta := actualQuota - preConsumedQuota
 
 	if quotaDelta == 0 {
+		settleTaskProfit(ctx, task, baseQuota, actualQuota)
 		logger.LogInfo(ctx, fmt.Sprintf("任务 %s 预扣费准确（%s，%s）",
 			task.TaskID, logger.LogQuota(actualQuota), reason))
 		return
@@ -230,8 +242,9 @@ func RecalculateTaskQuota(ctx context.Context, task *model.Task, actualQuota int
 	))
 
 	// 调整资金来源
-	if err := taskAdjustFunding(task, quotaDelta); err != nil {
+	if err := adjustTaskFundingAndProfit(ctx, task, quotaDelta, baseQuota, actualQuota); err != nil {
 		logger.LogError(ctx, fmt.Sprintf("差额结算资金调整失败 task %s: %s", task.TaskID, err.Error()))
+		settleTaskProfit(ctx, task, baseQuota, preConsumedQuota)
 		return
 	}
 
@@ -286,33 +299,30 @@ func RecalculateTaskQuotaByTokens(ctx context.Context, task *model.Task, totalTo
 
 	modelName := taskModelName(task)
 
-	// 获取模型价格和倍率
-	modelRatio, hasRatioSetting, _ := ratio_setting.GetModelRatio(modelName)
-	// 只有配置了倍率(非固定价格)时才按 token 重新计费
-	if !hasRatioSetting || modelRatio <= 0 {
-		return
-	}
-
-	// 获取用户和组的倍率信息
-	group := task.Group
-	if group == "" {
-		user, err := model.GetUserById(task.UserId, false)
-		if err == nil {
+	var modelRatio, finalGroupRatio float64
+	if bc := task.PrivateData.BillingContext; bc != nil {
+		modelRatio, finalGroupRatio = bc.ModelRatio, bc.GroupRatio
+	} else {
+		var configured bool
+		modelRatio, configured, _ = ratio_setting.GetModelRatio(modelName)
+		if !configured || modelRatio <= 0 {
+			return
+		}
+		group := task.Group
+		if group == "" {
+			user, err := model.GetUserById(task.UserId, false)
+			if err != nil {
+				return
+			}
 			group = user.Group
 		}
-	}
-	if group == "" {
-		return
-	}
-
-	groupRatio := ratio_setting.GetGroupRatio(group)
-	userGroupRatio, hasUserGroupRatio := ratio_setting.GetGroupGroupRatio(group, group)
-
-	var finalGroupRatio float64
-	if hasUserGroupRatio {
-		finalGroupRatio = userGroupRatio
-	} else {
-		finalGroupRatio = groupRatio
+		if group == "" {
+			return
+		}
+		finalGroupRatio = ratio_setting.GetGroupRatio(group)
+		if special, exists := ratio_setting.GetGroupGroupRatio(group, group); exists {
+			finalGroupRatio = special
+		}
 	}
 
 	// 计算 OtherRatios 乘积（视频折扣、时长等）
@@ -322,8 +332,43 @@ func RecalculateTaskQuotaByTokens(ctx context.Context, task *model.Task, totalTo
 	}
 
 	// 计算实际应扣费额度: totalTokens * modelRatio * groupRatio * otherMultiplier（饱和转换，防止溢出成负数）
+	baseQuota := float64(totalTokens) * modelRatio * otherMultiplier
 	actualQuota, clamp := common.QuotaFromFloatChecked(float64(totalTokens) * modelRatio * finalGroupRatio * otherMultiplier)
 
 	reason := fmt.Sprintf("token重算：tokens=%d, modelRatio=%.2f, groupRatio=%.2f, otherMultiplier=%.4f", totalTokens, modelRatio, finalGroupRatio, otherMultiplier)
-	RecalculateTaskQuota(ctx, task, actualQuota, reason, clamp)
+	recalculateTaskQuota(ctx, task, actualQuota, baseQuota, reason, clamp)
+}
+
+func adjustTaskFundingAndProfit(ctx context.Context, task *model.Task, delta int, baseQuota float64, revenueQuota int) error {
+	bc := task.PrivateData.BillingContext
+	if bc == nil || bc.ProfitEventKey == "" || baseQuota < 0 {
+		if delta == 0 {
+			return nil
+		}
+		return taskAdjustFunding(task, delta)
+	}
+	adjustment := model.ProfitFundingAdjustment{EventKey: bc.ProfitEventKey, UserID: task.UserId, TaskID: task.ID, Delta: delta, BaseQuota: baseQuota, RevenueQuota: int64(revenueQuota)}
+	if taskIsSubscription(task) {
+		adjustment.SubscriptionID = task.PrivateData.SubscriptionId
+	}
+	if err := model.AdjustFundingWithProfit(adjustment); err != nil {
+		return err
+	}
+	if err := model.ApplyChannelProfitSettlement(bc.ProfitEventKey); err != nil {
+		logger.LogError(ctx, fmt.Sprintf("profit settlement queued for retry: task=%s error=%s", task.TaskID, err))
+	}
+	return nil
+}
+
+func settleTaskProfit(ctx context.Context, task *model.Task, baseQuota float64, revenueQuota int) {
+	if baseQuota < 0 {
+		return
+	}
+	bc := task.PrivateData.BillingContext
+	if bc == nil || bc.ProfitEventKey == "" {
+		return
+	}
+	if err := model.SetChannelProfitTotal(bc.ProfitEventKey, baseQuota, int64(revenueQuota)); err != nil {
+		logger.LogError(ctx, fmt.Sprintf("failed to settle task profit: task=%s error=%s", task.TaskID, err))
+	}
 }

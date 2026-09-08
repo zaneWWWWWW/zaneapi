@@ -1,223 +1,160 @@
 package model
 
 import (
-	"strings"
-	"testing"
-
 	"github.com/QuantumNous/new-api/common"
+	"github.com/QuantumNous/new-api/types"
 	"github.com/gin-gonic/gin"
 	"github.com/glebarez/sqlite"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"gorm.io/gorm"
+	"math"
+	"strings"
+	"testing"
 )
 
 func setupChannelProfitDB(t *testing.T) {
 	t.Helper()
 	db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
 	require.NoError(t, err)
-	require.NoError(t, db.AutoMigrate(&Channel{}, &ChannelProfitRecord{}))
-
+	require.NoError(t, db.AutoMigrate(&Channel{}, &ChannelProfitRecord{}, &ChannelProfitSettlement{}))
 	originalDB, originalLogDB := DB, LOG_DB
 	DB, LOG_DB = db, db
-	t.Cleanup(func() {
-		DB, LOG_DB = originalDB, originalLogDB
-	})
+	t.Cleanup(func() { DB, LOG_DB = originalDB, originalLogDB })
 }
 
-func TestChannelProfitRecordsSnapshotCostAndReverseRefunds(t *testing.T) {
+func TestChannelProfitUsesStandardCost(t *testing.T) {
+	for _, tc := range []struct {
+		name                  string
+		upstream, group       float64
+		revenue, cost, profit int64
+	}{
+		{"discounted", .7, .9, 900, 700, 200},
+		{"free upstream", 0, .9, 900, 0, 900},
+		{"free user", .7, 0, 0, 700, -700},
+		{"both free", 0, 0, 0, 0, 0},
+		{"above one", 1.2, 1.5, 1500, 1200, 300},
+		{"loss", 1.2, .9, 900, 1200, -300},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			setupChannelProfitDB(t)
+			basis := types.ProfitBasis{BaseQuota: 1000, GroupRatio: tc.group, UpstreamRatio: &tc.upstream}
+			RecordChannelProfit("request", 1, "model", tc.revenue, 100, basis)
+			RecordChannelProfit("request", 1, "model", tc.revenue, 100, basis)
+			report, err := GetChannelProfitReport(1, 200)
+			require.NoError(t, err)
+			assert.Equal(t, tc.revenue, report.RevenueQuota)
+			assert.Equal(t, tc.cost, report.CostQuota)
+			assert.Equal(t, tc.profit, report.ProfitQuota)
+			assert.Equal(t, int64(1), report.RequestCount)
+		})
+	}
+}
+
+func TestChannelProfitRefundUsesOriginalSnapshot(t *testing.T) {
 	setupChannelProfitDB(t)
-
-	ratio := 0.75
-	channel := &Channel{Name: "profit-channel", CostRatio: &ratio}
-	require.NoError(t, DB.Create(channel).Error)
-
-	RecordChannelProfit("consume-1", channel.Id, "gpt-test", 1000, 100)
-	RecordChannelProfit("consume-1", channel.Id, "gpt-test", 1000, 100)
-	RecordChannelProfit("refund-1", channel.Id, "gpt-test", -200, 101)
-
-	var consumed ChannelProfitRecord
-	require.NoError(t, DB.Where("event_key = ?", "consume-1").First(&consumed).Error)
-	assert.Equal(t, 0.75, consumed.CostRatio)
-	assert.Equal(t, int64(750), consumed.CostQuota)
-
-	report, err := GetChannelProfitReport(1, 200)
+	ratio := .7
+	channel := Channel{Name: "original", UpstreamRatio: &ratio}
+	require.NoError(t, DB.Create(&channel).Error)
+	RecordChannelProfit("task", channel.Id, "model", 900, 100, types.ProfitBasis{BaseQuota: 1000, GroupRatio: .9, UpstreamRatio: &ratio})
+	require.NoError(t, DB.Model(&channel).Update("upstream_ratio", .2).Error)
+	require.NoError(t, SetChannelProfitTotal("task", 2000, 1800))
+	require.NoError(t, SetChannelProfitTotal("task", 2000, 1800))
+	report, err := GetChannelProfitReport(1, common.GetTimestamp()+1)
 	require.NoError(t, err)
-	require.Len(t, report.Channels, 1)
-	assert.Equal(t, int64(800), report.RevenueQuota)
-	assert.Equal(t, int64(600), report.CostQuota)
-	assert.Equal(t, int64(200), report.ProfitQuota)
+	assert.Equal(t, int64(1400), report.CostQuota)
 	assert.Equal(t, int64(1), report.RequestCount)
-	assert.Equal(t, int64(1), report.Channels[0].RequestCount)
-	assert.Equal(t, "profit-channel", report.Channels[0].ChannelName)
+	require.NoError(t, DB.Delete(&channel).Error)
+	require.NoError(t, SetChannelProfitTotal("task", 0, 0))
+	require.NoError(t, SetChannelProfitTotal("task", 0, 0))
+	report, err = GetChannelProfitReport(1, common.GetTimestamp()+1)
+	require.NoError(t, err)
+	assert.Zero(t, report.RevenueQuota)
+	assert.Zero(t, report.CostQuota)
+	assert.Zero(t, report.ProfitQuota)
+	var count int64
+	require.NoError(t, DB.Model(&ChannelProfitRecord{}).Count(&count).Error)
+	assert.Equal(t, int64(3), count)
 }
 
-func TestChannelProfitSkipsChannelsWithoutCostRatio(t *testing.T) {
+func TestChannelProfitRoundingAndRefund(t *testing.T) {
 	setupChannelProfitDB(t)
+	ratio := .7
+	RecordChannelProfit("tiny", 1, "model", 1, 100, types.ProfitBasis{BaseQuota: 1.4, GroupRatio: .9, UpstreamRatio: &ratio})
+	require.NoError(t, SetChannelProfitTotal("tiny", .6, 1))
+	require.NoError(t, SetChannelProfitTotal("tiny", 0, 0))
+	report, err := GetChannelProfitReport(1, common.GetTimestamp()+1)
+	require.NoError(t, err)
+	assert.Zero(t, report.CostQuota)
+	assert.Zero(t, report.ProfitQuota)
+}
 
-	channel := &Channel{Name: "unconfigured-channel", Status: common.ChannelStatusEnabled}
-	require.NoError(t, DB.Create(channel).Error)
-	disabled := &Channel{Name: "disabled-unconfigured", Status: common.ChannelStatusManuallyDisabled}
-	require.NoError(t, DB.Create(disabled).Error)
+func TestChannelProfitIndependentOfUsageLogAvailability(t *testing.T) {
+	for _, enabled := range []bool{true, false} {
+		t.Run(map[bool]string{true: "log database unavailable", false: "logs disabled"}[enabled], func(t *testing.T) {
+			setupChannelProfitDB(t)
+			previous := common.LogConsumeEnabled
+			common.LogConsumeEnabled = enabled
+			t.Cleanup(func() { common.LogConsumeEnabled = previous })
+			ratio := .7
+			ctx, _ := gin.CreateTestContext(nil)
+			ctx.Set(common.RequestIdKey, "consume")
+			params := RecordConsumeLogParams{ChannelId: 1, ModelName: "model", Quota: 900, ProfitBasis: &types.ProfitBasis{BaseQuota: 1000, GroupRatio: .9, UpstreamRatio: &ratio}}
+			RecordConsumeLog(ctx, 1, params)
+			params.SkipProfit = true
+			params.ProfitEventKey = "channel-test"
+			RecordConsumeLog(ctx, 1, params)
+			report, err := GetChannelProfitReport(1, common.GetTimestamp()+1)
+			require.NoError(t, err)
+			assert.Equal(t, int64(900), report.RevenueQuota)
+			assert.Equal(t, int64(700), report.CostQuota)
+			assert.Equal(t, int64(1), report.RequestCount)
+		})
+	}
+}
 
-	RecordChannelProfit("consume-1", channel.Id, "gpt-test", 1000, 100)
+func TestChannelProfitExcludesLegacyAndUnconfiguredRecords(t *testing.T) {
+	setupChannelProfitDB(t)
+	require.NoError(t, DB.Create(&Channel{Name: "unconfigured", Status: common.ChannelStatusEnabled}).Error)
+	require.NoError(t, DB.Create(&Channel{Name: "disabled", Status: common.ChannelStatusManuallyDisabled}).Error)
+	require.NoError(t, DB.Create(&ChannelProfitRecord{EventKey: "legacy", RevenueQuota: 1000, CostQuota: 750, ProfitQuota: 250, CreatedAt: 100}).Error)
+	RecordChannelProfit("unconfigured", 1, "model", 900, 100, types.ProfitBasis{BaseQuota: 1000, GroupRatio: .9})
 	report, err := GetChannelProfitReport(1, 200)
 	require.NoError(t, err)
 	assert.Empty(t, report.Channels)
+	assert.Zero(t, report.RevenueQuota)
 	assert.Equal(t, int64(1), report.UnconfiguredChannelCount)
 }
 
-func TestChannelProfitRecordsConsumptionWhenUsageLogsAreDisabled(t *testing.T) {
-	setupChannelProfitDB(t)
-	originalLogConsumeEnabled := common.LogConsumeEnabled
-	common.LogConsumeEnabled = false
-	t.Cleanup(func() { common.LogConsumeEnabled = originalLogConsumeEnabled })
-
-	ratio := 0.4
-	channel := &Channel{Name: "no-log-channel", CostRatio: &ratio}
-	require.NoError(t, DB.Create(channel).Error)
-
-	ctx, _ := gin.CreateTestContext(nil)
-	ctx.Set(common.RequestIdKey, "no-log-consume")
-	RecordConsumeLog(ctx, 1, RecordConsumeLogParams{
-		ChannelId: channel.Id,
-		ModelName: "gpt-test",
-		Quota:     1000,
-	})
-
-	report, err := GetChannelProfitReport(1, common.GetTimestamp()+1)
-	require.NoError(t, err)
-	assert.Equal(t, int64(1000), report.RevenueQuota)
-	assert.Equal(t, int64(400), report.CostQuota)
-}
-
-func TestChannelProfitSkipsChannelTests(t *testing.T) {
-	setupChannelProfitDB(t)
-
-	ratio := 0.5
-	channel := &Channel{Name: "test-channel", CostRatio: &ratio}
-	require.NoError(t, DB.Create(channel).Error)
-
-	ctx, _ := gin.CreateTestContext(nil)
-	ctx.Set(common.RequestIdKey, "channel-test")
-	RecordConsumeLog(ctx, 1, RecordConsumeLogParams{
-		ChannelId:  channel.Id,
-		ModelName:  "gpt-test",
-		Quota:      1000,
-		SkipProfit: true,
-	})
-
-	report, err := GetChannelProfitReport(1, common.GetTimestamp()+1)
-	require.NoError(t, err)
-	assert.Equal(t, int64(0), report.RevenueQuota)
-	assert.Empty(t, report.Channels)
-}
-
-func TestChannelProfitTaskBillingUsesStableEventKey(t *testing.T) {
-	setupChannelProfitDB(t)
-	originalLogConsumeEnabled := common.LogConsumeEnabled
-	common.LogConsumeEnabled = false
-	t.Cleanup(func() { common.LogConsumeEnabled = originalLogConsumeEnabled })
-
-	ratio := 0.5
-	channel := &Channel{Name: "task-channel", CostRatio: &ratio}
-	require.NoError(t, DB.Create(channel).Error)
-
-	params := RecordTaskBillingLogParams{
-		LogType:   LogTypeConsume,
-		ChannelId: channel.Id,
-		ModelName: "gpt-test",
-		Quota:     800,
-		Other:     map[string]interface{}{"task_id": "task-1"},
+func TestValidateProfitSettings(t *testing.T) {
+	for _, ratio := range []float64{0, .7, 1, 1.2} {
+		require.NoError(t, (&Channel{UpstreamRatio: &ratio}).ValidateProfitSettings())
 	}
-	RecordTaskBillingLog(params)
-	RecordTaskBillingLog(params)
-
-	report, err := GetChannelProfitReport(1, common.GetTimestamp()+1)
-	require.NoError(t, err)
-	assert.Equal(t, int64(800), report.RevenueQuota)
-	assert.Equal(t, int64(400), report.CostQuota)
-	assert.Equal(t, int64(1), report.RequestCount)
+	for _, ratio := range []float64{-1, math.NaN(), math.Inf(1), math.Inf(-1)} {
+		require.Error(t, (&Channel{UpstreamRatio: &ratio}).ValidateProfitSettings())
+	}
 }
 
-func TestValidateProfitSettingsRejectsRatioAboveOne(t *testing.T) {
-	ratio := 1.5
-	channel := &Channel{CostRatio: &ratio}
-	require.EqualError(t, channel.ValidateProfitSettings(), "cost ratio must be between 0 and 1")
-
-	valid := 1.0
-	channel.CostRatio = &valid
-	require.NoError(t, channel.ValidateProfitSettings())
-}
-
-func TestChannelProfitRecordsZeroAndFullCostRatio(t *testing.T) {
+func TestChannelProfitRejectsInvalidBasis(t *testing.T) {
 	setupChannelProfitDB(t)
-
-	zero := 0.0
-	full := 1.0
-	free := &Channel{Name: "free-channel", CostRatio: &zero}
-	costly := &Channel{Name: "costly-channel", CostRatio: &full}
-	require.NoError(t, DB.Create(free).Error)
-	require.NoError(t, DB.Create(costly).Error)
-
-	RecordChannelProfit("free-1", free.Id, "gpt-test", 1000, 100)
-	RecordChannelProfit("cost-1", costly.Id, "gpt-test", 1000, 100)
-
+	for _, ratio := range []float64{-1, math.NaN(), math.Inf(1)} {
+		RecordChannelProfit("invalid", 1, "model", 900, 100, types.ProfitBasis{BaseQuota: 1000, GroupRatio: .9, UpstreamRatio: &ratio})
+	}
 	report, err := GetChannelProfitReport(1, 200)
 	require.NoError(t, err)
-	assert.Equal(t, int64(2000), report.RevenueQuota)
-	assert.Equal(t, int64(1000), report.CostQuota)
-	assert.Equal(t, int64(1000), report.ProfitQuota)
-}
-
-func TestChannelProfitSkipsInvalidRatioAtRecordTime(t *testing.T) {
-	setupChannelProfitDB(t)
-
-	ratio := 1.25
-	channel := &Channel{Name: "invalid-ratio", CostRatio: &ratio}
-	require.NoError(t, DB.Create(channel).Error)
-
-	RecordChannelProfit("invalid-1", channel.Id, "gpt-test", 1000, 100)
-	report, err := GetChannelProfitReport(1, 200)
-	require.NoError(t, err)
-	assert.Equal(t, int64(0), report.RevenueQuota)
 	assert.Empty(t, report.Channels)
 }
 
-func TestChannelProfitHashesOversizedEventKeys(t *testing.T) {
+func TestChannelProfitTimeRangeAndOversizedKeys(t *testing.T) {
 	setupChannelProfitDB(t)
-
-	ratio := 0.5
-	channel := &Channel{Name: "long-key-channel", CostRatio: &ratio}
-	require.NoError(t, DB.Create(channel).Error)
-
-	eventKey := strings.Repeat("k", 200)
-	RecordChannelProfit(eventKey, channel.Id, strings.Repeat("m", 300), 500, 100)
-	RecordChannelProfit(eventKey, channel.Id, "ignored", 500, 100)
-
-	var count int64
-	require.NoError(t, DB.Model(&ChannelProfitRecord{}).Count(&count).Error)
-	assert.Equal(t, int64(1), count)
-
-	var record ChannelProfitRecord
-	require.NoError(t, DB.First(&record).Error)
-	assert.LessOrEqual(t, len(record.EventKey), 128)
-	assert.LessOrEqual(t, len(record.ModelName), 255)
-}
-
-func TestChannelProfitReportRespectsTimeRange(t *testing.T) {
-	setupChannelProfitDB(t)
-
-	ratio := 0.5
-	channel := &Channel{Name: "ranged-channel", CostRatio: &ratio}
-	require.NoError(t, DB.Create(channel).Error)
-	RecordChannelProfit("old", channel.Id, "gpt-test", 1000, 50)
-	RecordChannelProfit("in-range", channel.Id, "gpt-test", 400, 150)
-	RecordChannelProfit("new", channel.Id, "gpt-test", 800, 300)
-
+	ratio := .7
+	basis := types.ProfitBasis{BaseQuota: 1000, GroupRatio: .9, UpstreamRatio: &ratio}
+	key := strings.Repeat("k", 200)
+	RecordChannelProfit(key, 1, strings.Repeat("模", 300), 900, 100, basis)
+	RecordChannelProfit(key, 1, "model", 900, 100, basis)
+	RecordChannelProfit("outside", 1, "model", 900, 300, basis)
 	report, err := GetChannelProfitReport(100, 200)
 	require.NoError(t, err)
-	assert.Equal(t, int64(400), report.RevenueQuota)
-	assert.Equal(t, int64(200), report.CostQuota)
-	assert.Equal(t, int64(1), report.RequestCount)
+	assert.Equal(t, int64(900), report.RevenueQuota)
+	require.NoError(t, SetChannelProfitTotal(key, 0, 0))
 }

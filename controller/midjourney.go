@@ -212,10 +212,18 @@ func runMidjourneyTaskUpdateOnce(ctx context.Context, report func(processed, tot
 			won, err := task.UpdateWithStatus(preStatus)
 			if err != nil {
 				logger.LogError(ctx, "UpdateMidjourneyTask task error: "+err.Error())
-			} else if won && shouldReturnQuota {
-				err = model.IncreaseUserQuota(task.UserId, task.Quota, true)
+			} else if won && (shouldReturnQuota || (task.Status == "FAILURE" && task.ProfitEventKey != "")) {
+				if task.ProfitEventKey != "" {
+					err = model.AdjustFundingWithProfit(model.ProfitFundingAdjustment{EventKey: task.ProfitEventKey, UserID: task.UserId, Delta: -task.Quota, BaseQuota: 0, RevenueQuota: 0})
+				} else {
+					err = model.IncreaseUserQuota(task.UserId, task.Quota, true)
+				}
 				if err != nil {
 					logger.LogError(ctx, "fail to increase user quota: "+err.Error())
+				} else if task.ProfitEventKey != "" {
+					if profitErr := model.ApplyChannelProfitSettlement(task.ProfitEventKey); profitErr != nil {
+						logger.LogError(ctx, "failed to refund Midjourney profit: "+profitErr.Error())
+					}
 				}
 				model.RecordTaskBillingLog(model.RecordTaskBillingLogParams{
 					UserId:    task.UserId,

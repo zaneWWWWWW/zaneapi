@@ -85,7 +85,7 @@ func sweepTimedOutTasks(ctx context.Context) {
 			continue
 		}
 		timedOutCount++
-		if !isLegacy && task.Quota != 0 {
+		if !isLegacy {
 			RefundTaskQuota(ctx, task, reason)
 		}
 	}
@@ -147,6 +147,12 @@ type TaskPollSummary struct {
 // adaptor factory has not been wired yet, to avoid a nil call during startup.
 func RunTaskPollingOnce(ctx context.Context, report func(processed, total int)) TaskPollSummary {
 	summary := TaskPollSummary{}
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	if err := model.RetryPendingChannelProfits(ctx, 100); err != nil {
+		logger.LogError(ctx, "profit retry sweep failed: "+err.Error())
+	}
 	if GetTaskAdaptorFunc == nil {
 		return summary
 	}
@@ -344,7 +350,7 @@ func updateSunoTasks(ctx context.Context, channelId int, taskIds []string, taskM
 			logger.LogError(ctx, fmt.Sprintf("UpdateSunoTask task %s error: %v", task.TaskID, err))
 		} else if !won {
 			logger.LogWarn(ctx, fmt.Sprintf("Task %s CAS lost or no-op update, skip billing", task.TaskID))
-		} else if isFailure && prevStatus != model.TaskStatusFailure && task.Quota != 0 {
+		} else if isFailure && prevStatus != model.TaskStatusFailure {
 			RefundTaskQuota(ctx, task, task.FailReason)
 		}
 	}
@@ -562,8 +568,6 @@ func updateVideoSingleTask(ctx context.Context, adaptor TaskPollingAdaptor, ch *
 
 	shouldRefund := false
 	shouldSettle := false
-	quota := task.Quota
-
 	task.Status = model.TaskStatus(taskResult.Status)
 	switch taskResult.Status {
 	case model.TaskStatusSubmitted:
@@ -601,9 +605,7 @@ func updateVideoSingleTask(ctx context.Context, adaptor TaskPollingAdaptor, ch *
 		task.FailReason = taskResult.Reason
 		logger.LogInfo(ctx, fmt.Sprintf("Task %s failed: %s", task.TaskID, task.FailReason))
 		taskResult.Progress = taskcommon.ProgressComplete
-		if quota != 0 {
-			shouldRefund = true
-		}
+		shouldRefund = true
 	default:
 		return fmt.Errorf("unknown task status %s for task %s", taskResult.Status, task.TaskID)
 	}
@@ -689,7 +691,19 @@ func settleTaskBillingOnComplete(ctx context.Context, adaptor TaskPollingAdaptor
 	}
 	// 1. 优先让 adaptor 决定最终额度
 	if actualQuota := adaptor.AdjustBillingOnComplete(task, taskResult); actualQuota > 0 {
-		RecalculateTaskQuota(ctx, task, actualQuota, "adaptor计费调整")
+		standardTask := *task
+		if bc := task.PrivateData.BillingContext; bc != nil {
+			standardContext := *bc
+			standardContext.GroupRatio = 1
+			standardTask.PrivateData.BillingContext = &standardContext
+		}
+		standardQuota := adaptor.AdjustBillingOnComplete(&standardTask, taskResult)
+		if standardQuota <= 0 {
+			logger.LogError(ctx, fmt.Sprintf("missing standard cost for task %s", task.TaskID))
+			RecalculateTaskQuota(ctx, task, actualQuota, "adaptor计费调整")
+		} else {
+			recalculateTaskQuota(ctx, task, actualQuota, float64(standardQuota), "adaptor计费调整")
+		}
 		return
 	}
 	// 2. 回退到 token 重算

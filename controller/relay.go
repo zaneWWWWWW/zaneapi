@@ -613,6 +613,8 @@ func RelayTask(c *gin.Context) {
 		task.PrivateData.TokenUnlimited = relayInfo.TokenUnlimited
 		task.PrivateData.NodeName = common.NodeName
 		task.PrivateData.BillingContext = &model.TaskBillingContext{
+			BaseQuota:       relayInfo.PriceData.BaseQuota,
+			ProfitEventKey:  fmt.Sprintf("task:%d:%s", relayInfo.ChannelId, relayInfo.PublicTaskID),
 			ModelPrice:      relayInfo.PriceData.ModelPrice,
 			GroupRatio:      relayInfo.PriceData.GroupRatioInfo.GroupRatio,
 			ModelRatio:      relayInfo.PriceData.ModelRatio,
@@ -621,6 +623,12 @@ func RelayTask(c *gin.Context) {
 			PerCallBilling:  common.StringsContains(constant.TaskPricePatches, relayInfo.OriginModelName) || relayInfo.PriceData.UsePrice,
 		}
 		task.Quota = result.Quota
+		if relayInfo.ProfitRevenueQuota != nil {
+			task.Quota = *relayInfo.ProfitRevenueQuota
+		}
+		if relayInfo.UpstreamRatio == nil {
+			task.PrivateData.BillingContext.ProfitEventKey = ""
+		}
 		task.Data = result.TaskData
 		task.Action = relayInfo.Action
 		if insertErr := task.Insert(); insertErr != nil {

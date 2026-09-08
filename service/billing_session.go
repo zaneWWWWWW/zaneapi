@@ -30,6 +30,7 @@ type BillingSession struct {
 	tokenConsumed    int  // 令牌额度实际扣减量
 	extraReserved    int  // 发送前补充预扣的额度（订阅退款时需要单独回滚）
 	fundingSettled   bool // funding.Settle 已成功，资金来源已提交
+	fundingQuota     int  // Actual total after a successful funding settlement.
 	settled          bool // Settle 全部完成（资金 + 令牌）
 	refunded         bool // Refund 已调用
 	mu               sync.Mutex
@@ -65,11 +66,13 @@ func (s *BillingSession) Settle(actualQuota int) error {
 			return err
 		}
 		s.fundingSettled = true
+		s.fundingQuota = actualQuota
 	} else {
 		if err := s.funding.Settle(delta); err != nil {
 			return err
 		}
 		s.fundingSettled = true
+		s.fundingQuota = actualQuota
 		if !s.relayInfo.IsPlayground && !s.relayInfo.TokenUnlimited {
 			if err := model.IncreaseTokenQuota(s.relayInfo.TokenId, s.relayInfo.TokenKey, -delta); err != nil {
 				common.SysLog(fmt.Sprintf("error refunding token quota after funding settled (userId=%d, tokenId=%d, amount=%d): %s",
@@ -85,6 +88,17 @@ func (s *BillingSession) Settle(actualQuota int) error {
 	}
 	s.settled = true
 	return nil
+}
+
+// FundedQuota distinguishes a failed funding operation from a token refund
+// failure after the wallet or subscription has already been committed.
+func (s *BillingSession) FundedQuota() int {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.fundingSettled {
+		return s.fundingQuota
+	}
+	return s.preConsumedQuota
 }
 
 // Refund 退还所有预扣费，幂等安全，异步执行。

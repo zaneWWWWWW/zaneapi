@@ -210,7 +210,7 @@ func RelaySwapFace(c *gin.Context, info *relaycommon.RelayInfo) *dto.MidjourneyR
 			Description: err.Error(),
 		}
 	}
-	billable := !priceData.FreeModel
+	billable := true
 	if billable {
 		if apiErr := service.PreConsumeBilling(c, priceData.Quota, info); apiErr != nil {
 			return &dto.MidjourneyResponse{Code: 4, Description: apiErr.Error()}
@@ -245,14 +245,16 @@ func RelaySwapFace(c *gin.Context, info *relaycommon.RelayInfo) *dto.MidjourneyR
 		logContent := fmt.Sprintf("模型固定价格 %.2f，分组倍率 %.2f，操作 %s", priceData.ModelPrice, priceData.GroupRatioInfo.GroupRatio, constant.MjActionSwapFace)
 		other := service.GenerateMjOtherInfo(info, priceData)
 		model.RecordConsumeLog(c, info.UserId, model.RecordConsumeLogParams{
-			ChannelId: info.ChannelId,
-			ModelName: modelName,
-			TokenName: tokenName,
-			Quota:     priceData.Quota,
-			Content:   logContent,
-			TokenId:   info.TokenId,
-			Group:     info.UsingGroup,
-			Other:     other,
+			ProfitBasis:    service.ProfitBasis(info, priceData.BaseQuota),
+			ProfitEventKey: fmt.Sprintf("mj:%d:%s", info.ChannelId, mjResp.Response.Result),
+			ChannelId:      info.ChannelId,
+			ModelName:      modelName,
+			TokenName:      tokenName,
+			Quota:          priceData.Quota,
+			Content:        logContent,
+			TokenId:        info.TokenId,
+			Group:          info.UsingGroup,
+			Other:          other,
 		})
 		model.UpdateUserUsedQuotaAndRequestCount(info.UserId, priceData.Quota)
 		model.UpdateChannelUsedQuota(info.ChannelId, priceData.Quota)
@@ -277,6 +279,9 @@ func RelaySwapFace(c *gin.Context, info *relaycommon.RelayInfo) *dto.MidjourneyR
 		Ip:          c.ClientIP(),
 		ChannelId:   c.GetInt("channel_id"),
 		Quota:       priceData.Quota,
+	}
+	if info.UpstreamRatio != nil {
+		midjourneyTask.ProfitEventKey = fmt.Sprintf("mj:%d:%s", info.ChannelId, midjResponse.Result)
 	}
 	err = midjourneyTask.Insert()
 	if err != nil {
@@ -520,7 +525,7 @@ func RelayMidjourneySubmit(c *gin.Context, relayInfo *relaycommon.RelayInfo) *dt
 		}
 	}
 
-	billable := consumeQuota && !priceData.FreeModel
+	billable := consumeQuota
 	if billable {
 		if apiErr := service.PreConsumeBilling(c, priceData.Quota, relayInfo); apiErr != nil {
 			return &dto.MidjourneyResponse{Code: 4, Description: apiErr.Error()}
@@ -555,14 +560,16 @@ func RelayMidjourneySubmit(c *gin.Context, relayInfo *relaycommon.RelayInfo) *dt
 		logContent := fmt.Sprintf("模型固定价格 %.2f，分组倍率 %.2f，操作 %s，ID %s", priceData.ModelPrice, priceData.GroupRatioInfo.GroupRatio, midjRequest.Action, midjResponse.Result)
 		other := service.GenerateMjOtherInfo(relayInfo, priceData)
 		model.RecordConsumeLog(c, relayInfo.UserId, model.RecordConsumeLogParams{
-			ChannelId: relayInfo.ChannelId,
-			ModelName: modelName,
-			TokenName: tokenName,
-			Quota:     priceData.Quota,
-			Content:   logContent,
-			TokenId:   relayInfo.TokenId,
-			Group:     relayInfo.UsingGroup,
-			Other:     other,
+			ProfitBasis:    service.ProfitBasis(relayInfo, priceData.BaseQuota),
+			ProfitEventKey: fmt.Sprintf("mj:%d:%s", relayInfo.ChannelId, midjResponse.Result),
+			ChannelId:      relayInfo.ChannelId,
+			ModelName:      modelName,
+			TokenName:      tokenName,
+			Quota:          priceData.Quota,
+			Content:        logContent,
+			TokenId:        relayInfo.TokenId,
+			Group:          relayInfo.UsingGroup,
+			Other:          other,
 		})
 		model.UpdateUserUsedQuotaAndRequestCount(relayInfo.UserId, priceData.Quota)
 		model.UpdateChannelUsedQuota(relayInfo.ChannelId, priceData.Quota)
@@ -637,6 +644,9 @@ func RelayMidjourneySubmit(c *gin.Context, relayInfo *relaycommon.RelayInfo) *dt
 	if midjResponse.Code == 1 && midjRequest.Action == "UPLOAD" {
 		midjourneyTask.Progress = "100%"
 		midjourneyTask.Status = "SUCCESS"
+	}
+	if relayInfo.UpstreamRatio != nil {
+		midjourneyTask.ProfitEventKey = fmt.Sprintf("mj:%d:%s", relayInfo.ChannelId, midjResponse.Result)
 	}
 	err = midjourneyTask.Insert()
 	if err != nil {

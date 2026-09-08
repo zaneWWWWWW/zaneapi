@@ -3679,15 +3679,16 @@ export function ChannelMutateDrawer({
                               {canEditProfitSettings && (
                                 <FormField
                                   control={form.control}
-                                  name='cost_ratio'
+                                  name='upstream_ratio'
                                   render={({ field }) => (
                                     <FormItem>
-                                      <FormLabel>{t('Cost ratio')}</FormLabel>
+                                      <FormLabel>
+                                        {t('Upstream ratio')}
+                                      </FormLabel>
                                       <FormControl>
                                         <Input
                                           type='number'
                                           min='0'
-                                          max='1'
                                           step='0.01'
                                           placeholder='0.72'
                                           value={field.value ?? ''}
@@ -3703,7 +3704,7 @@ export function ChannelMutateDrawer({
                                       </FormControl>
                                       <FormDescription>
                                         {t(
-                                          'Upstream cost share of final user charge. Use 0.72 for 72%.'
+                                          'Standard model cost multiplied by the upstream group ratio. Use 0 for free upstream usage; values above 1 are allowed. Leave empty to exclude this channel.'
                                         )}
                                       </FormDescription>
                                       <FormMessage />

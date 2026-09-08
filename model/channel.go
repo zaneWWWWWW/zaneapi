@@ -40,10 +40,10 @@ type Channel struct {
 	Models             string  `json:"models"`
 	Group              string  `json:"group" gorm:"type:varchar(64);default:'default'"`
 	UsedQuota          int64   `json:"used_quota" gorm:"bigint;default:0"`
-	// CostRatio is the upstream cost as a share of the final user charge.
+	// UpstreamRatio multiplies standard usage before the user's group discount.
 	// A nil value means the channel is not included in profit accounting.
-	CostRatio    *float64 `json:"cost_ratio"`
-	ModelMapping *string  `json:"model_mapping" gorm:"type:text"`
+	UpstreamRatio *float64 `json:"upstream_ratio"`
+	ModelMapping  *string  `json:"model_mapping" gorm:"type:text"`
 	//MaxInputTokens     *int    `json:"max_input_tokens" gorm:"default:0"`
 	StatusCodeMapping *string `json:"status_code_mapping" gorm:"type:varchar(1024);default:''"`
 	Priority          *int64  `json:"priority" gorm:"bigint;default:0"`
@@ -74,11 +74,11 @@ type ChannelInfo struct {
 }
 
 func (channel *Channel) ValidateProfitSettings() error {
-	if channel.CostRatio == nil {
+	if channel.UpstreamRatio == nil {
 		return nil
 	}
-	if math.IsNaN(*channel.CostRatio) || math.IsInf(*channel.CostRatio, 0) || *channel.CostRatio < 0 || *channel.CostRatio > 1 {
-		return errors.New("cost ratio must be between 0 and 1")
+	if math.IsNaN(*channel.UpstreamRatio) || math.IsInf(*channel.UpstreamRatio, 0) || *channel.UpstreamRatio < 0 {
+		return errors.New("upstream ratio must be finite and non-negative")
 	}
 	return nil
 }
