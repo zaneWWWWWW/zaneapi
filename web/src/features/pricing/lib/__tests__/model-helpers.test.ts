@@ -9,6 +9,7 @@ const model: PricingModel = {
   model_name: 'gpt-test',
   quota_type: 0,
   model_ratio: 1,
+  completion_ratio: 1,
   enable_groups: ['gptPLUS', 'gptPRO'],
   group_ratio: { gptPLUS: 0.15, gptPRO: 0.2 },
 }

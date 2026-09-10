@@ -32,6 +32,7 @@ import { SettingsPageTitleStatusPortal } from '../components/settings-page-conte
 import { SettingsSection } from '../components/settings-section'
 import { useUpdateOption } from '../hooks/use-update-option'
 import { GroupRatioForm } from './group-ratio-form'
+import { haveSameModelPricingDefaults } from './model-pricing-defaults'
 import { ModelRatioForm } from './model-ratio-form'
 import { ToolPriceSettings } from './tool-price-settings'
 import { UpstreamRatioSync } from './upstream-ratio-sync'
@@ -197,6 +198,7 @@ export function RatioSettingsCard({
   const [savedModelValues, setSavedModelValues] = useState(
     modelNormalizedDefaults.current
   )
+  const receivedModelDefaults = useRef(modelDefaults)
 
   const groupNormalizedDefaults = useRef({
     GroupRatio: normalizeJsonString(groupDefaults.GroupRatio),
@@ -249,6 +251,13 @@ export function RatioSettingsCard({
   })
 
   useEffect(() => {
+    if (
+      haveSameModelPricingDefaults(receivedModelDefaults.current, modelDefaults)
+    ) {
+      return
+    }
+    receivedModelDefaults.current = modelDefaults
+
     modelNormalizedDefaults.current = {
       ModelPrice: normalizeJsonString(modelDefaults.ModelPrice),
       ModelRatio: normalizeJsonString(modelDefaults.ModelRatio),
