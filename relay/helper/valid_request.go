@@ -264,7 +264,8 @@ func GetAndValidOpenAIImageRequest(c *gin.Context, relayMode int) (*dto.ImageReq
 
 	// Codex image_gen cannot send response_format and only parses b64_json.
 	// Keep that compatibility default for earlier gpt-image models, but let
-	// gpt-image-2 use its native parameter surface without response_format.
+	// gpt-image-2 / gpt-image-2.5 use their native parameter surface
+	// (output_format) without injecting response_format.
 	// Explicit response_format (including url) is always preserved.
 	if strings.TrimSpace(imageRequest.ResponseFormat) == "" && prefersB64JSONImageResponse(imageRequest.Model) {
 		imageRequest.ResponseFormat = "b64_json"
@@ -284,10 +285,25 @@ func GetAndValidOpenAIImageRequest(c *gin.Context, relayMode int) (*dto.ImageReq
 
 func prefersB64JSONImageResponse(modelName string) bool {
 	modelName = strings.ToLower(strings.TrimSpace(modelName))
-	if modelName == "gpt-image-2" || strings.HasPrefix(modelName, "gpt-image-2-") {
+	if skipsDefaultImageResponseFormat(modelName) {
 		return false
 	}
 	return strings.HasPrefix(modelName, "gpt-image") || strings.HasPrefix(modelName, "chatgpt-image")
+}
+
+// skipsDefaultImageResponseFormat matches gpt-image-2 / gpt-image-2.5 and
+// their dated or named variants. gpt-image-2.5-sunburst must not be treated
+// as gpt-image-1: a leading "gpt-image-2-" check misses the '.' in "2.5".
+func skipsDefaultImageResponseFormat(modelName string) bool {
+	const image2 = "gpt-image-2"
+	if modelName == image2 {
+		return true
+	}
+	if strings.HasPrefix(modelName, image2) {
+		next := modelName[len(image2)]
+		return next == '-' || next == '.'
+	}
+	return false
 }
 
 func GetAndValidateClaudeRequest(c *gin.Context) (textRequest *dto.ClaudeRequest, err error) {
