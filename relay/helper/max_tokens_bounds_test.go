@@ -69,4 +69,22 @@ func TestMaxTokensBounds(t *testing.T) {
 		require.Error(t, err)
 		require.Contains(t, err.Error(), "max_output_tokens is invalid")
 	})
+
+	for _, temperature := range []string{"-0.1", "2.1", "10"} {
+		t.Run("openai temperature "+temperature+" rejected", func(t *testing.T) {
+			c := newJSONContext(t, `{"model":"gpt-5.6-sol","messages":[{"role":"user","content":"hi"}],"temperature":`+temperature+`}`)
+			_, err := GetAndValidateTextRequest(c, relayconstant.RelayModeChatCompletions)
+			require.Error(t, err)
+			require.EqualError(t, err, "temperature must be between 0 and 2")
+		})
+	}
+
+	t.Run("openai temperature range endpoints accepted", func(t *testing.T) {
+		for _, temperature := range []string{"0", "2"} {
+			c := newJSONContext(t, `{"model":"gpt-5.6-sol","messages":[{"role":"user","content":"hi"}],"temperature":`+temperature+`}`)
+			req, err := GetAndValidateTextRequest(c, relayconstant.RelayModeChatCompletions)
+			require.NoError(t, err)
+			require.NotNil(t, req.Temperature)
+		}
+	})
 }
