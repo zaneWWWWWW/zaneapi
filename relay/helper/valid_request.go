@@ -119,6 +119,11 @@ func GetAndValidateEmbeddingRequest(c *gin.Context, relayMode int) (*dto.Embeddi
 // overflow the conversion and corrupt billing.
 const maxTokensLimit = math.MaxInt32 / 2
 
+const (
+	minTemperature = 0.0
+	maxTemperature = 2.0
+)
+
 func exceedsMaxTokensLimit(values ...*uint) bool {
 	for _, v := range values {
 		if lo.FromPtrOr(v, uint(0)) > maxTokensLimit {
@@ -126,6 +131,13 @@ func exceedsMaxTokensLimit(values ...*uint) bool {
 		}
 	}
 	return false
+}
+
+func invalidTemperature(value *float64) bool {
+	if value == nil {
+		return false
+	}
+	return math.IsNaN(*value) || math.IsInf(*value, 0) || *value < minTemperature || *value > maxTemperature
 }
 
 func GetAndValidateResponsesRequest(c *gin.Context) (*dto.OpenAIResponsesRequest, error) {
@@ -345,6 +357,9 @@ func GetAndValidateTextRequest(c *gin.Context, relayMode int) (*dto.GeneralOpenA
 
 	if exceedsMaxTokensLimit(textRequest.MaxTokens, textRequest.MaxCompletionTokens) {
 		return nil, errors.New("max_tokens is invalid")
+	}
+	if invalidTemperature(textRequest.Temperature) {
+		return nil, errors.New("temperature must be between 0 and 2")
 	}
 	if textRequest.Model == "" {
 		return nil, errors.New("model is required")
