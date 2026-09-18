@@ -21,14 +21,11 @@ import {
   AlertCircle,
   Copy,
   Download,
-  ExternalLink,
-  Maximize2,
   Play,
   RotateCcw,
   Sparkles,
   Trash2,
 } from 'lucide-react'
-import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
 
@@ -47,15 +44,12 @@ interface CreationCardProps {
 
 export function CreationCard(props: CreationCardProps) {
   const { t } = useTranslation()
-  const [copied, setCopied] = useState(false)
   const item = props.creation
 
   const handleCopyPrompt = (e: React.MouseEvent) => {
     e.stopPropagation()
     navigator.clipboard.writeText(item.prompt)
-    setCopied(true)
     toast.success(t('Prompt copied to clipboard!'))
-    setTimeout(() => setCopied(false), 2000)
   }
 
   const handleDownload = (e: React.MouseEvent) => {
