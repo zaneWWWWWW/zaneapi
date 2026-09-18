@@ -224,6 +224,11 @@ func EstimateRequestToken(c *gin.Context, meta *types.TokenCountMeta, info *rela
 
 	if meta.TokenType == types.TokenTypeTextNumber {
 		tkm += utf8.RuneCountInString(meta.CombineText)
+	} else if info.RelayFormat == types.RelayFormatOpenAIImage {
+		// 生图 prompt 的 token 数不影响定价（按次价或模型倍率都取 MaxTokens，prompt 只用于
+		// 日志展示）。tiktoken 对超长文本开销超线性（实测 100KB prompt 约 4.6s、1MB 需数分钟），
+		// 单个大 prompt 请求就能长时间占满 worker，这里改用本地估算。
+		tkm += EstimateTokenByModel(model, meta.CombineText)
 	} else {
 		tkm += CountTextToken(meta.CombineText, model)
 	}
