@@ -83,12 +83,12 @@ export function useTaskPoller(options: UseTaskPollerOptions) {
             })
           } else {
             // Still in progress / queued
-            const progress =
-              typeof anyRes.progress === 'number'
-                ? anyRes.progress
-                : statusStr === 'in_progress'
-                  ? Math.max(item.progress || 10, 20)
-                  : 5
+            let progress = 5
+            if (typeof anyRes.progress === 'number') {
+              progress = anyRes.progress
+            } else if (statusStr === 'in_progress') {
+              progress = Math.max(item.progress || 10, 20)
+            }
 
             updateCreationRef.current(item.id, {
               status: statusStr === 'in_progress' ? 'in_progress' : 'queued',
