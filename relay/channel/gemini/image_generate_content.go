@@ -321,6 +321,11 @@ func geminiInlineImages(response *dto.GeminiChatResponse) []dto.ImageData {
 			if !strings.HasPrefix(strings.ToLower(part.InlineData.MimeType), "image/") {
 				continue
 			}
+			// 上游可能返回损坏的图片数据：非 base64 的 payload 直接透传会让客户端
+			// 拿到无法解码的 b64_json，这里与 markdown 路径保持一致地丢弃。
+			if !validGeminiImageBase64(part.InlineData.Data) {
+				continue
+			}
 			images = append(images, dto.ImageData{B64Json: part.InlineData.Data})
 		}
 	}
