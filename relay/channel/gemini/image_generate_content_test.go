@@ -238,6 +238,12 @@ func TestGeminiGenerateContentImageHandlerErrors(t *testing.T) {
 			wantCode:   types.ErrorCodePromptBlocked,
 			wantStatus: http.StatusBadRequest,
 		},
+		{
+			name:       "inline image with invalid base64 reports a missing image",
+			payload:    `{"candidates":[{"content":{"role":"model","parts":[{"inlineData":{"mimeType":"image/png","data":"!!!not-base64!!!"}}]}}],"usageMetadata":{"promptTokenCount":11,"candidatesTokenCount":7,"totalTokenCount":18}}`,
+			wantCode:   types.ErrorCodeEmptyResponse,
+			wantStatus: http.StatusInternalServerError,
+		},
 	}
 
 	for _, tt := range tests {
