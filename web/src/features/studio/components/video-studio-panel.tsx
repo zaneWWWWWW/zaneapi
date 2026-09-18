@@ -21,7 +21,6 @@ import {
   Clapperboard,
   Clock,
   Compass,
-  Film,
   Loader2,
   Tv,
 } from 'lucide-react'
@@ -101,7 +100,7 @@ export function VideoStudioPanel(props: VideoStudioPanelProps) {
           </label>
           <Select
             value={props.selectedModel}
-            onValueChange={props.onModelChange}
+            onValueChange={(v) => v !== null && props.onModelChange(v)}
           >
             <SelectTrigger className='w-full text-xs font-medium'>
               <SelectValue placeholder={t('Select Video Model')} />

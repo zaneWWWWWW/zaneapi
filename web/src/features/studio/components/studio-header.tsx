@@ -80,7 +80,7 @@ export function StudioHeader(props: StudioHeaderProps) {
           </div>
           <Select
             value={props.selectedGroup}
-            onValueChange={props.onGroupChange}
+            onValueChange={(v) => v !== null && props.onGroupChange(v)}
           >
             <SelectTrigger className='h-8 min-w-[110px] text-xs'>
               <SelectValue />

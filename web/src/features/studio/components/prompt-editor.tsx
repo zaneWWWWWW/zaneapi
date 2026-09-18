@@ -110,7 +110,7 @@ export function PromptEditor(props: PromptEditorProps) {
       <div className='flex items-center'>
         <Select
           value={currentInspiration?.id || ''}
-          onValueChange={handleSelectInspiration}
+          onValueChange={(v) => v !== null && handleSelectInspiration(v)}
         >
           <SelectTrigger className='h-7.5 w-full border-none bg-muted/25 hover:bg-muted/40 text-xs px-2.5 shadow-none rounded-lg focus-visible:ring-0 focus:ring-0'>
             <div className='flex items-center gap-1.5 truncate text-muted-foreground'>

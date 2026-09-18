@@ -100,7 +100,7 @@ export function ImageStudioPanel(props: ImageStudioPanelProps) {
           </div>
           <Select
             value={props.selectedModel}
-            onValueChange={props.onModelChange}
+            onValueChange={(v) => v !== null && props.onModelChange(v)}
           >
             <SelectTrigger className='w-full text-xs font-medium'>
               <SelectValue placeholder={t('Select Model')} />
@@ -148,19 +148,19 @@ export function ImageStudioPanel(props: ImageStudioPanelProps) {
             <div className='grid grid-cols-4 gap-1 rounded-lg border border-border/60 p-1 bg-muted/20'>
               {[1, 2, 3, 4].map((count) => {
                 const disabled = isDalle && count > 1
+                let stateClass = 'text-muted-foreground hover:text-foreground'
+                if (props.imageCount === count) {
+                  stateClass = 'bg-background text-foreground shadow-xs'
+                } else if (disabled) {
+                  stateClass = 'opacity-30 cursor-not-allowed text-muted-foreground'
+                }
                 return (
                   <button
                     key={count}
                     type='button'
                     disabled={disabled}
                     onClick={() => props.onImageCountChange(count)}
-                    className={`rounded-md py-1 text-xs font-medium transition-all ${
-                      props.imageCount === count
-                        ? 'bg-background text-foreground shadow-xs'
-                        : disabled
-                          ? 'opacity-30 cursor-not-allowed text-muted-foreground'
-                          : 'text-muted-foreground hover:text-foreground'
-                    }`}
+                    className={`rounded-md py-1 text-xs font-medium transition-all ${stateClass}`}
                   >
                     {count}
                   </button>
@@ -175,18 +175,24 @@ export function ImageStudioPanel(props: ImageStudioPanelProps) {
               {t('Quality')}
             </label>
             <div className='grid grid-cols-3 gap-1 rounded-lg border border-border/60 p-1 bg-muted/20'>
-              {(['standard', 'hd', 'ultra'] as const).map((q) => (
+              {(
+                [
+                  { value: 'standard', labelKey: 'Standard' },
+                  { value: 'hd', labelKey: 'HD' },
+                  { value: 'ultra', labelKey: 'Ultra' },
+                ] as const
+              ).map((q) => (
                 <button
-                  key={q}
+                  key={q.value}
                   type='button'
-                  onClick={() => props.onQualityChange(q)}
+                  onClick={() => props.onQualityChange(q.value)}
                   className={`rounded-md py-1 text-xs font-medium transition-all ${
-                    props.quality === q
+                    props.quality === q.value
                       ? 'bg-background text-foreground shadow-xs'
                       : 'text-muted-foreground hover:text-foreground'
                   }`}
                 >
-                  {t(q === 'standard' ? 'Standard' : q === 'hd' ? 'HD' : 'Ultra')}
+                  {t(q.labelKey)}
                 </button>
               ))}
             </div>
