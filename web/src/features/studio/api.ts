@@ -20,6 +20,7 @@ For commercial licensing, please contact support@quantumnous.com
 import { api } from '@/lib/api'
 
 import { POPULAR_IMAGE_MODELS, POPULAR_VIDEO_MODELS } from './constants'
+import { buildImageRequestBody } from './lib/image-request'
 import type {
   GroupOption,
   ImageGenerationRequest,
@@ -63,15 +64,7 @@ export async function generateImage(
 
   const res = await api.post(
     '/pg/images/generations',
-    {
-      model: payload.model,
-      prompt: payload.prompt,
-      n: payload.n || 1,
-      size: payload.size || '1024x1024',
-      quality: payload.quality,
-      style: payload.style,
-      response_format: payload.response_format || 'url',
-    },
+    buildImageRequestBody(payload),
     {
       signal,
       headers,
