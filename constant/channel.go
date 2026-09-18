@@ -56,6 +56,8 @@ const (
 	ChannelTypeReplicate      = 56
 	ChannelTypeCodex          = 57
 	ChannelTypeAdvancedCustom = 58
+	ChannelTypeAgnesAI        = 59
+	ChannelTypeVyceAI         = 60
 	ChannelTypeDummy          // this one is only for count, do not add any channel after this
 
 )
@@ -120,6 +122,8 @@ var ChannelBaseURLs = []string{
 	"https://api.replicate.com",                 //56
 	"https://chatgpt.com",                       //57
 	"",                                          //58
+	"https://apihub.agnes-ai.com",               //59
+	"https://vyceai.com",                        //60
 }
 
 var ChannelTypeNames = map[int]string{
@@ -178,6 +182,8 @@ var ChannelTypeNames = map[int]string{
 	ChannelTypeReplicate:      "Replicate",
 	ChannelTypeCodex:          "ChatGPT Subscription (Codex)",
 	ChannelTypeAdvancedCustom: "Advanced Custom",
+	ChannelTypeAgnesAI:        "AgnesAI",
+	ChannelTypeVyceAI:         "VyceAI",
 }
 
 func GetChannelTypeName(channelType int) string {
