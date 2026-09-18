@@ -22,8 +22,7 @@ import { useCallback } from 'react'
 import { ImageStudioPanel } from './components/image-studio-panel'
 import { StudioGallery } from './components/gallery/studio-gallery'
 import { StudioHeader } from './components/studio-header'
-import { VideoNoticeDialog } from './components/video-notice-dialog'
-import { VideoStudioPanel } from './components/video-studio-panel'
+import { VideoComingSoonPanel } from './components/video-coming-soon-panel'
 import { useStudioState } from './hooks/use-studio-state'
 
 export function Studio() {
@@ -82,27 +81,7 @@ export function Studio() {
               onGenerate={state.handleGenerate}
             />
           ) : (
-            <VideoStudioPanel
-              models={state.currentAvailableModels}
-              selectedModel={state.selectedVideoModel}
-              onModelChange={state.setSelectedVideoModel}
-              prompt={state.prompt}
-              onPromptChange={state.setPrompt}
-              aspectRatio={state.videoAspectRatio}
-              onAspectRatioChange={state.setVideoAspectRatio}
-              duration={state.videoDuration}
-              onDurationChange={state.setVideoDuration}
-              resolution={state.videoResolution}
-              onResolutionChange={state.setVideoResolution}
-              cameraMotion={state.cameraMotion}
-              onCameraMotionChange={state.setCameraMotion}
-              referenceImage={state.referenceImage}
-              onReferenceImageChange={state.setReferenceImage}
-              lastFrameImage={state.lastFrameImage}
-              onLastFrameImageChange={state.setLastFrameImage}
-              isGenerating={state.isGenerating}
-              onGenerate={state.handleGenerate}
-            />
+            <VideoComingSoonPanel />
           )}
         </div>
 
@@ -116,13 +95,6 @@ export function Studio() {
           />
         </div>
       </div>
-
-      {/* Video Generation First-time Notice Dialog */}
-      <VideoNoticeDialog
-        open={state.videoNoticeOpen}
-        onOpenChange={state.setVideoNoticeOpen}
-        onConfirm={state.confirmVideoNotice}
-      />
     </div>
   )
 }
