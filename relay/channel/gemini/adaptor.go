@@ -62,7 +62,12 @@ func (a *Adaptor) ConvertAudioRequest(c *gin.Context, info *relaycommon.RelayInf
 
 func (a *Adaptor) ConvertImageRequest(c *gin.Context, info *relaycommon.RelayInfo, request dto.ImageRequest) (any, error) {
 	if !strings.HasPrefix(info.UpstreamModelName, "imagen") {
-		return nil, errors.New("not supported model for image generation, only imagen models are supported")
+		// Chat-style Gemini image models (gemini-*-image*, "Nano Banana")
+		// generate images through generateContent instead of Imagen :predict.
+		if model_setting.IsGeminiModelSupportImagine(info.UpstreamModelName) {
+			return buildGeminiImageGenerateContentRequest(c, request)
+		}
+		return nil, fmt.Errorf("not supported model for image generation: %s is neither an imagen model nor listed in gemini.supported_imagine_models", info.UpstreamModelName)
 	}
 
 	// convert size to aspect ratio but allow user to specify aspect ratio
@@ -176,6 +181,14 @@ func (a *Adaptor) GetRequestURL(info *relaycommon.RelayInfo) (string, error) {
 func (a *Adaptor) SetupRequestHeader(c *gin.Context, req *http.Header, info *relaycommon.RelayInfo) error {
 	channel.SetupApiRequestHeader(info, c, req)
 	req.Set("x-goog-api-key", info.ApiKey)
+	// Image relays always send a JSON body upstream: imagen uses :predict and
+	// chat-style image models get a converted generateContent request. The
+	// client body may be multipart/form-data (images/edits), which must not be
+	// forwarded as the outbound content type.
+	switch info.RelayMode {
+	case constant.RelayModeImagesGenerations, constant.RelayModeImagesEdits:
+		req.Set("Content-Type", gin.MIMEJSON)
+	}
 	return nil
 }
 
@@ -272,6 +285,12 @@ func (a *Adaptor) DoResponse(c *gin.Context, resp *http.Response, info *relaycom
 		} else {
 			return GeminiTextGenerationHandler(c, info, resp)
 		}
+	}
+
+	// Image relay on a chat-style Gemini image model: generateContent returns
+	// the image as inlineData and must be reshaped into the OpenAI image form.
+	if info.RelayFormat == types.RelayFormatOpenAIImage && !strings.HasPrefix(info.UpstreamModelName, "imagen") {
+		return GeminiGenerateContentImageHandler(c, info, resp)
 	}
 
 	if strings.HasPrefix(info.UpstreamModelName, "imagen") {

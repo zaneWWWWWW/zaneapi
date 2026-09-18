@@ -50,13 +50,6 @@ func downloadImageURLForB64JSONDefault(imageURL string) ([]byte, error) {
 	return data, nil
 }
 
-func updateOpenAIImageCount(info *relaycommon.RelayInfo, count int64) {
-	if info == nil || !info.PriceData.UsePrice || count <= 0 || count > int64(dto.MaxImageN) {
-		return
-	}
-	info.PriceData.AddOtherRatio("n", float64(count))
-}
-
 // OpenaiImageHandler handles non-streaming OpenAI image responses
 // (generations/edits), returning the parsed usage for billing.
 func OpenaiImageHandler(c *gin.Context, info *relaycommon.RelayInfo, resp *http.Response) (*dto.Usage, *types.NewAPIError) {
@@ -82,7 +75,7 @@ func OpenaiImageHandler(c *gin.Context, info *relaycommon.RelayInfo, resp *http.
 		return nil, types.NewOpenAIError(err, types.ErrorCodeBadResponseBody, http.StatusBadGateway)
 	}
 
-	updateOpenAIImageCount(info, gjson.GetBytes(responseBody, "data.#").Int())
+	relaycommon.ApplyFixedPriceImageCount(info, gjson.GetBytes(responseBody, "data.#").Int())
 
 	// 写入新的 response body
 	service.IOCopyBytesGracefully(c, resp, responseBody)
@@ -240,7 +233,7 @@ func OpenaiImageStreamHandler(c *gin.Context, info *relaycommon.RelayInfo, resp 
 			requestedN = n
 		}
 		if upstreamFinished || float64(completedImages) > requestedN {
-			updateOpenAIImageCount(info, completedImages)
+			relaycommon.ApplyFixedPriceImageCount(info, completedImages)
 		}
 	}
 	return usage, nil
@@ -336,7 +329,7 @@ func openaiImageJSONAsStreamHandler(c *gin.Context, info *relaycommon.RelayInfo,
 	applyUsagePostProcessing(info, &usageResp.Usage, responseBody)
 
 	imageCount := gjson.GetBytes(responseBody, "data.#").Int()
-	updateOpenAIImageCount(info, imageCount)
+	relaycommon.ApplyFixedPriceImageCount(info, imageCount)
 
 	helper.SetEventStreamHeaders(c)
 	c.Status(http.StatusOK)
