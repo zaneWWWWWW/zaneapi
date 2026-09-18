@@ -1,6 +1,21 @@
 package common
 
-import "github.com/gin-gonic/gin"
+import (
+	"github.com/QuantumNous/new-api/dto"
+
+	"github.com/gin-gonic/gin"
+)
+
+// ApplyFixedPriceImageCount records how many images an image request actually
+// produced, so fixed-price (按次计费) image models settle on the real count
+// instead of the requested n. It replaces the pre-consume "n" ratio that
+// dto.ImageRequest.GetTokenCountMeta put on PriceData.
+func ApplyFixedPriceImageCount(info *RelayInfo, count int64) {
+	if info == nil || !info.PriceData.UsePrice || count <= 0 || count > int64(dto.MaxImageN) {
+		return
+	}
+	info.PriceData.AddOtherRatio("n", float64(count))
+}
 
 // BillingSettler 抽象计费会话的生命周期操作。
 // 由 service.BillingSession 实现，存储在 RelayInfo 上以避免循环引用。
