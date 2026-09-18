@@ -257,3 +257,27 @@ func TestTestAllChannelsRejectsExistingActiveTask(t *testing.T) {
 	require.Contains(t, recorder.Body.String(), existing.TaskID)
 	require.Contains(t, recorder.Body.String(), "已有通道测试任务正在运行或等待中")
 }
+
+func TestNormalizeChannelTestEndpointVideoModels(t *testing.T) {
+	require.Equal(t, string(constant.EndpointTypeOpenAIVideo), normalizeChannelTestEndpoint(nil, "sora-2", ""))
+	require.Equal(t, string(constant.EndpointTypeOpenAIVideo), normalizeChannelTestEndpoint(nil, "grok-imagine-video-1.5-preview", ""))
+	require.Equal(t, string(constant.EndpointTypeOpenAI), normalizeChannelTestEndpoint(nil, "sora-2", string(constant.EndpointTypeOpenAI)))
+}
+
+func TestBuildTestVideoRequestBody(t *testing.T) {
+	data, err := buildTestVideoRequestBody("sora-2")
+	require.NoError(t, err)
+
+	var body map[string]any
+	require.NoError(t, common.Unmarshal(data, &body))
+	require.Equal(t, "sora-2", body["model"])
+	require.NotEmpty(t, body["prompt"])
+	require.Equal(t, "4", body["seconds"])
+	require.Equal(t, "720x1280", body["size"])
+
+	data, err = buildTestVideoRequestBody("veo-3.1-generate-preview")
+	require.NoError(t, err)
+	require.NoError(t, common.Unmarshal(data, &body))
+	require.Equal(t, float64(8), body["duration"])
+	require.Equal(t, "1280x720", body["size"])
+}
