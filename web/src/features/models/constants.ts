@@ -193,6 +193,7 @@ export const ENDPOINT_TEMPLATES: Record<
   gemini: { path: '/v1beta/models/{model}:generateContent', method: 'POST' },
   'jina-rerank': { path: '/rerank', method: 'POST' },
   'image-generation': { path: '/v1/images/generations', method: 'POST' },
+  'openai-video': { path: '/v1/videos', method: 'POST' },
   embeddings: { path: '/v1/embeddings', method: 'POST' },
 }
 
