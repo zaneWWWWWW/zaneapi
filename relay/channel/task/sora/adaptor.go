@@ -38,19 +38,26 @@ type ImageURL struct {
 	URL string `json:"url"`
 }
 
+type VideoData struct {
+	URL         string `json:"url,omitempty"`
+	Filename    string `json:"filename,omitempty"`
+	ContentType string `json:"content_type,omitempty"`
+}
+
 type responseTask struct {
-	ID                 string `json:"id"`
-	TaskID             string `json:"task_id,omitempty"` //兼容旧接口
-	Object             string `json:"object"`
-	Model              string `json:"model"`
-	Status             string `json:"status"`
-	Progress           int    `json:"progress"`
-	CreatedAt          int64  `json:"created_at"`
-	CompletedAt        int64  `json:"completed_at,omitempty"`
-	ExpiresAt          int64  `json:"expires_at,omitempty"`
-	Seconds            string `json:"seconds,omitempty"`
-	Size               string `json:"size,omitempty"`
-	RemixedFromVideoID string `json:"remixed_from_video_id,omitempty"`
+	ID                 string      `json:"id"`
+	TaskID             string      `json:"task_id,omitempty"` //兼容旧接口
+	Object             string      `json:"object"`
+	Model              string      `json:"model"`
+	Status             string      `json:"status"`
+	Progress           int         `json:"progress"`
+	CreatedAt          int64       `json:"created_at"`
+	CompletedAt        int64       `json:"completed_at,omitempty"`
+	ExpiresAt          int64       `json:"expires_at,omitempty"`
+	Seconds            string      `json:"seconds,omitempty"`
+	Size               string      `json:"size,omitempty"`
+	RemixedFromVideoID string      `json:"remixed_from_video_id,omitempty"`
+	Data               []VideoData `json:"data,omitempty"`
 	Error              *struct {
 		Message string `json:"message"`
 		Code    string `json:"code"`
@@ -130,10 +137,48 @@ func (a *TaskAdaptor) EstimateBilling(c *gin.Context, info *relaycommon.RelayInf
 }
 
 func (a *TaskAdaptor) BuildRequestURL(info *relaycommon.RelayInfo) (string, error) {
-	if info.Action == constant.TaskActionRemix {
-		return fmt.Sprintf("%s/v1/videos/%s/remix", a.baseURL, info.OriginTaskID), nil
+	baseURL := strings.TrimRight(a.baseURL, "/")
+	if info != nil && info.TaskRelayInfo != nil && info.Action == constant.TaskActionRemix {
+		cleanBase := strings.TrimSuffix(baseURL, "/v1/videos")
+		cleanBase = strings.TrimSuffix(cleanBase, "/v1/video/generations")
+		cleanBase = strings.TrimSuffix(cleanBase, "/v1/videos/generations")
+		cleanBase = strings.TrimSuffix(cleanBase, "/v1")
+		cleanBase = strings.TrimRight(cleanBase, "/")
+		return fmt.Sprintf("%s/v1/videos/%s/remix", cleanBase, info.OriginTaskID), nil
 	}
-	return fmt.Sprintf("%s/v1/videos", a.baseURL), nil
+
+	// If the user already specified a full endpoint ending in /video/generations or /videos/generations or /videos:
+	if strings.HasSuffix(baseURL, "/v1/video/generations") ||
+		strings.HasSuffix(baseURL, "/v1/videos/generations") ||
+		strings.HasSuffix(baseURL, "/v1/videos") {
+		return baseURL, nil
+	}
+
+	if isXaiRelayInfo(info) {
+		if strings.HasSuffix(baseURL, "/v1") {
+			return fmt.Sprintf("%s/videos/generations", baseURL), nil
+		}
+		return fmt.Sprintf("%s/v1/videos/generations", baseURL), nil
+	}
+
+	if isMinimaxRelayInfo(info) {
+		if strings.HasSuffix(baseURL, "/v1") {
+			return fmt.Sprintf("%s/video/generations", baseURL), nil
+		}
+		return fmt.Sprintf("%s/v1/video/generations", baseURL), nil
+	}
+
+	if info != nil && (strings.HasSuffix(info.RequestURLPath, "/video/generations") || strings.HasSuffix(info.RequestURLPath, "/videos/generations")) {
+		if strings.HasSuffix(baseURL, "/v1") {
+			return fmt.Sprintf("%s/video/generations", baseURL), nil
+		}
+		return fmt.Sprintf("%s/v1/video/generations", baseURL), nil
+	}
+
+	if strings.HasSuffix(baseURL, "/v1") {
+		return fmt.Sprintf("%s/videos", baseURL), nil
+	}
+	return fmt.Sprintf("%s/v1/videos", baseURL), nil
 }
 
 // BuildRequestHeader sets required headers.
@@ -158,6 +203,9 @@ func (a *TaskAdaptor) BuildRequestBody(c *gin.Context, info *relaycommon.RelayIn
 		var bodyMap map[string]interface{}
 		if err := common.Unmarshal(cachedBody, &bodyMap); err == nil {
 			bodyMap["model"] = info.UpstreamModelName
+			if isXaiRelayInfo(info) {
+				normalizeXaiVideoRequestBody(bodyMap)
+			}
 			if newBody, err := common.Marshal(bodyMap); err == nil {
 				return bytes.NewReader(newBody), nil
 			}
@@ -233,6 +281,11 @@ func (a *TaskAdaptor) DoResponse(c *gin.Context, resp *http.Response, info *rela
 	}
 	_ = resp.Body.Close()
 
+	if resp.StatusCode >= http.StatusBadRequest {
+		taskErr = service.TaskErrorWrapper(fmt.Errorf("upstream error (%d): %s", resp.StatusCode, string(responseBody)), "upstream_error", resp.StatusCode)
+		return
+	}
+
 	// Parse Sora response
 	var dResp responseTask
 	if err := common.Unmarshal(responseBody, &dResp); err != nil {
@@ -245,8 +298,16 @@ func (a *TaskAdaptor) DoResponse(c *gin.Context, resp *http.Response, info *rela
 		upstreamID = dResp.TaskID
 	}
 	if upstreamID == "" {
-		taskErr = service.TaskErrorWrapper(fmt.Errorf("task_id is empty"), "invalid_response", http.StatusInternalServerError)
-		return
+		upstreamID = info.PublicTaskID
+		dResp.ID = info.PublicTaskID
+	}
+
+	// Check if upstream returned direct completed video URL
+	if len(dResp.Data) > 0 && dResp.Data[0].URL != "" {
+		if dResp.Status == "" {
+			dResp.Status = "completed"
+		}
+		dResp.Progress = 100
 	}
 
 	// 使用公开 task_xxxx ID 返回给客户端
@@ -263,7 +324,14 @@ func (a *TaskAdaptor) FetchTask(baseUrl, key string, body map[string]any, proxy 
 		return nil, fmt.Errorf("invalid task_id")
 	}
 
-	uri := fmt.Sprintf("%s/v1/videos/%s", baseUrl, taskID)
+	cleanBase := strings.TrimRight(baseUrl, "/")
+	cleanBase = strings.TrimSuffix(cleanBase, "/v1/video/generations")
+	cleanBase = strings.TrimSuffix(cleanBase, "/v1/videos/generations")
+	cleanBase = strings.TrimSuffix(cleanBase, "/v1/videos")
+	cleanBase = strings.TrimSuffix(cleanBase, "/v1")
+	cleanBase = strings.TrimRight(cleanBase, "/")
+
+	uri := fmt.Sprintf("%s/v1/videos/%s", cleanBase, taskID)
 
 	req, err := http.NewRequest(http.MethodGet, uri, nil)
 	if err != nil {
@@ -297,6 +365,12 @@ func (a *TaskAdaptor) ParseTaskResult(respBody []byte) (*relaycommon.TaskInfo, e
 		Code: 0,
 	}
 
+	if len(resTask.Data) > 0 && resTask.Data[0].URL != "" {
+		taskResult.Status = model.TaskStatusSuccess
+		taskResult.Url = resTask.Data[0].URL
+		return &taskResult, nil
+	}
+
 	switch resTask.Status {
 	case "queued", "pending":
 		taskResult.Status = model.TaskStatusQueued
@@ -304,7 +378,9 @@ func (a *TaskAdaptor) ParseTaskResult(respBody []byte) (*relaycommon.TaskInfo, e
 		taskResult.Status = model.TaskStatusInProgress
 	case "completed":
 		taskResult.Status = model.TaskStatusSuccess
-		// Url intentionally left empty — the caller constructs the proxy URL using the public task ID
+		if len(resTask.Data) > 0 {
+			taskResult.Url = resTask.Data[0].URL
+		}
 	case "failed", "cancelled":
 		taskResult.Status = model.TaskStatusFailure
 		if resTask.Error != nil {
@@ -328,4 +404,88 @@ func (a *TaskAdaptor) ConvertToOpenAIVideo(task *model.Task) ([]byte, error) {
 		return nil, errors.Wrap(err, "set id failed")
 	}
 	return data, nil
+}
+
+func isXaiVideoModel(modelName string) bool {
+	return strings.HasPrefix(modelName, "grok-imagine-video")
+}
+
+func normalizeXaiVideoRequestBody(req map[string]interface{}) {
+	if req == nil {
+		return
+	}
+
+	if image, ok := req["image"]; ok {
+		if imageURL, ok := image.(string); ok && strings.TrimSpace(imageURL) != "" {
+			req["image"] = map[string]interface{}{"url": imageURL}
+		}
+		return
+	}
+
+	if imageURL := getRequestString(req, "image_url"); imageURL != "" {
+		req["image"] = map[string]interface{}{"url": imageURL}
+		delete(req, "image_url")
+		return
+	}
+
+	if inputReference := getRequestString(req, "input_reference"); inputReference != "" {
+		req["image"] = map[string]interface{}{"url": inputReference}
+		delete(req, "input_reference")
+		return
+	}
+
+	if images, ok := req["images"].([]interface{}); ok && len(images) > 0 {
+		switch first := images[0].(type) {
+		case string:
+			if strings.TrimSpace(first) != "" {
+				req["image"] = map[string]interface{}{"url": first}
+				delete(req, "images")
+			}
+		case map[string]interface{}:
+			req["image"] = first
+			delete(req, "images")
+		}
+	}
+}
+
+func getRequestString(req map[string]interface{}, key string) string {
+	value, ok := req[key]
+	if !ok || value == nil {
+		return ""
+	}
+	if s, ok := value.(string); ok {
+		return strings.TrimSpace(s)
+	}
+	return strings.TrimSpace(fmt.Sprint(value))
+}
+
+func isXaiRelayInfo(info *relaycommon.RelayInfo) bool {
+	if info == nil {
+		return false
+	}
+	if isXaiVideoModel(info.OriginModelName) {
+		return true
+	}
+	if info.ChannelMeta == nil {
+		return false
+	}
+	return isXaiVideoModel(info.ChannelMeta.UpstreamModelName)
+}
+
+func isMinimaxVideoModel(modelName string) bool {
+	name := strings.ToLower(modelName)
+	return strings.HasPrefix(name, "minimax") || strings.HasPrefix(name, "h3")
+}
+
+func isMinimaxRelayInfo(info *relaycommon.RelayInfo) bool {
+	if info == nil {
+		return false
+	}
+	if isMinimaxVideoModel(info.OriginModelName) {
+		return true
+	}
+	if info.ChannelMeta == nil {
+		return false
+	}
+	return isMinimaxVideoModel(info.ChannelMeta.UpstreamModelName)
 }

@@ -144,6 +144,26 @@ export const CHANNEL_TYPE_CONFIGS: Record<number, ChannelTypeConfig> = {
       models: 'Models exposed by this channel',
     },
   },
+  59: {
+    id: 59,
+    name: CHANNEL_TYPES[59],
+    icon: 'openai',
+    defaultBaseUrl: 'https://apihub.agnes-ai.com',
+    hints: {
+      key: 'Agnes AI API Key',
+      models: 'agnes-2.5-flash,agnes-image-2.5-flash,agnes-video-2.5',
+    },
+  },
+  60: {
+    id: 60,
+    name: CHANNEL_TYPES[60],
+    icon: 'openai',
+    defaultBaseUrl: 'https://vyceai.com',
+    hints: {
+      key: 'VyceAI API Key',
+      models: 'vyce-image-1x1,vyce-image-16x9,vyce-image-9x16',
+    },
+  },
 }
 
 /**

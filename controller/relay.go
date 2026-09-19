@@ -610,6 +610,7 @@ func RelayTask(c *gin.Context) {
 
 		task := model.InitTask(result.Platform, relayInfo)
 		task.PrivateData.UpstreamTaskID = result.UpstreamTaskID
+		task.PrivateData.UpstreamVideoID = relayInfo.UpstreamVideoID
 		task.PrivateData.BillingSource = relayInfo.BillingSource
 		task.PrivateData.SubscriptionId = relayInfo.SubscriptionId
 		task.PrivateData.TokenId = relayInfo.TokenId
@@ -634,6 +635,27 @@ func RelayTask(c *gin.Context) {
 		}
 		task.Data = result.TaskData
 		task.Action = relayInfo.Action
+
+		// Check if task is already completed synchronously (e.g. direct response with video URL)
+		var syncCheck struct {
+			Status string `json:"status"`
+			Data   []struct {
+				URL string `json:"url"`
+			} `json:"data"`
+		}
+		if err := common.Unmarshal(result.TaskData, &syncCheck); err == nil {
+			if len(syncCheck.Data) > 0 && syncCheck.Data[0].URL != "" {
+				task.Status = model.TaskStatusSuccess
+				task.Progress = "100%"
+				task.FinishTime = time.Now().Unix()
+				task.PrivateData.ResultURL = syncCheck.Data[0].URL
+			} else if syncCheck.Status == "completed" {
+				task.Status = model.TaskStatusSuccess
+				task.Progress = "100%"
+				task.FinishTime = time.Now().Unix()
+			}
+		}
+
 		if insertErr := task.Insert(); insertErr != nil {
 			common.SysError("insert task error: " + insertErr.Error())
 		}
