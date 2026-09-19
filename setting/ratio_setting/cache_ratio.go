@@ -5,6 +5,10 @@ import (
 )
 
 var defaultCacheRatio = map[string]float64{
+	"agnes-2.5-flash":                     0.1,
+	"agnes-2.5-pro-beta":                  0.1,
+	"agnes-2.5-pro":                       0.1,
+	"agnes-3.0-flash":                     0.1,
 	"gemini-3-flash-preview":              0.1,
 	"gemini-3-pro-preview":                0.1,
 	"gemini-3.1-pro-preview":              0.1,
@@ -147,7 +151,7 @@ func CreateCacheRatio2JSONString() string {
 
 // UpdateCacheRatioByJSONString updates the cache ratio map from a JSON string
 func UpdateCacheRatioByJSONString(jsonStr string) error {
-	return types.LoadFromJsonStringWithCallback(cacheRatioMap, jsonStr, InvalidateExposedDataCache)
+	return loadWithAgnesDefaults(cacheRatioMap, jsonStr, defaultCacheRatio)
 }
 
 // UpdateCreateCacheRatioByJSONString updates the create cache ratio map from a JSON string

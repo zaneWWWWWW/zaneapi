@@ -25,6 +25,7 @@ import {
   LayoutDashboard,
   MessageSquare,
   Radio,
+  Sparkles,
   Store,
   Ticket,
   Trophy,
@@ -85,6 +86,11 @@ export function useSidebarData(): SidebarData {
 
     const mainItems: NavItem[] = [
       ...exploreItems,
+      {
+        title: t('Studio'),
+        url: '/studio',
+        icon: Sparkles,
+      },
       {
         title: t('Playground'),
         url: '/playground',
