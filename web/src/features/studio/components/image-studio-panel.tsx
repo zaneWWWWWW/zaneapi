@@ -148,19 +148,24 @@ export function ImageStudioPanel(props: ImageStudioPanelProps) {
             <div className='grid grid-cols-4 gap-1 rounded-lg border border-border/60 p-1 bg-muted/20'>
               {[1, 2, 3, 4].map((count) => {
                 const disabled = isDalle && count > 1
-                let stateClass = 'text-muted-foreground hover:text-foreground'
-                if (props.imageCount === count) {
-                  stateClass = 'bg-background text-foreground shadow-xs'
+                const selected = props.imageCount === count
+                let stateClass =
+                  'border-transparent text-muted-foreground hover:border-border hover:text-foreground'
+                if (selected) {
+                  stateClass =
+                    'border-primary bg-primary/10 text-primary shadow-xs'
                 } else if (disabled) {
-                  stateClass = 'opacity-30 cursor-not-allowed text-muted-foreground'
+                  stateClass =
+                    'border-transparent opacity-30 cursor-not-allowed text-muted-foreground'
                 }
                 return (
                   <button
                     key={count}
                     type='button'
                     disabled={disabled}
+                    aria-pressed={selected}
                     onClick={() => props.onImageCountChange(count)}
-                    className={`rounded-md py-1 text-xs font-medium transition-all ${stateClass}`}
+                    className={`rounded-md border py-1 text-xs font-medium transition-all ${stateClass}`}
                   >
                     {count}
                   </button>
@@ -181,20 +186,26 @@ export function ImageStudioPanel(props: ImageStudioPanelProps) {
                   { value: 'hd', labelKey: 'HD' },
                   { value: 'ultra', labelKey: 'Ultra' },
                 ] as const
-              ).map((q) => (
-                <button
-                  key={q.value}
-                  type='button'
-                  onClick={() => props.onQualityChange(q.value)}
-                  className={`rounded-md py-1 text-xs font-medium transition-all ${
-                    props.quality === q.value
-                      ? 'bg-background text-foreground shadow-xs'
-                      : 'text-muted-foreground hover:text-foreground'
-                  }`}
-                >
-                  {t(q.labelKey)}
-                </button>
-              ))}
+              ).map((q) => {
+                const selected = props.quality === q.value
+                let stateClass =
+                  'border-transparent text-muted-foreground hover:border-border hover:text-foreground'
+                if (selected) {
+                  stateClass =
+                    'border-primary bg-primary/10 text-primary shadow-xs'
+                }
+                return (
+                  <button
+                    key={q.value}
+                    type='button'
+                    aria-pressed={selected}
+                    onClick={() => props.onQualityChange(q.value)}
+                    className={`rounded-md border py-1 text-xs font-medium transition-all ${stateClass}`}
+                  >
+                    {t(q.labelKey)}
+                  </button>
+                )
+              })}
             </div>
           </div>
         </div>
