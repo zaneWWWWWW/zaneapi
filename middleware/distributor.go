@@ -25,8 +25,8 @@ import (
 )
 
 type ModelRequest struct {
-	Model string `json:"model"`
-	Group string `json:"group,omitempty"`
+	Model string `json:"model" form:"model"`
+	Group string `json:"group,omitempty" form:"group"`
 }
 
 func Distribute() func(c *gin.Context) {
@@ -83,22 +83,13 @@ func Distribute() func(c *gin.Context) {
 				}
 				var selectGroup string
 				usingGroup := common.GetContextKeyString(c, constant.ContextKeyUsingGroup)
-				// check path is /pg/chat/completions
-				if strings.HasPrefix(c.Request.URL.Path, "/pg/chat/completions") {
-					playgroundRequest := &dto.PlayGroundRequest{}
-					err = common.UnmarshalBodyReusable(c, playgroundRequest)
-					if err != nil {
-						abortWithOpenAiMessage(c, http.StatusBadRequest, i18n.T(c, i18n.MsgDistributorInvalidPlayground, map[string]any{"Error": err.Error()}))
+				if playgroundGroup := playgroundRequestedGroup(c.Request.URL.Path, modelRequest.Group, c.GetHeader("New-Api-Group")); playgroundGroup != "" {
+					if !service.GroupInUserUsableGroups(usingGroup, playgroundGroup) && playgroundGroup != usingGroup {
+						abortWithOpenAiMessage(c, http.StatusForbidden, i18n.T(c, i18n.MsgDistributorGroupAccessDenied))
 						return
 					}
-					if playgroundRequest.Group != "" {
-						if !service.GroupInUserUsableGroups(usingGroup, playgroundRequest.Group) && playgroundRequest.Group != usingGroup {
-							abortWithOpenAiMessage(c, http.StatusForbidden, i18n.T(c, i18n.MsgDistributorGroupAccessDenied))
-							return
-						}
-						usingGroup = playgroundRequest.Group
-						common.SetContextKey(c, constant.ContextKeyUsingGroup, usingGroup)
-					}
+					usingGroup = playgroundGroup
+					common.SetContextKey(c, constant.ContextKeyUsingGroup, usingGroup)
 				}
 
 				if preferredChannelID, found := service.GetPreferredChannelByAffinity(c, modelRequest.Model, usingGroup); found {
@@ -181,6 +172,19 @@ func channelSupportsRequestPath(channel *model.Channel, requestPath string, requ
 	}
 	config := channel.GetOtherSettings().AdvancedCustom
 	return config != nil && config.SupportsPathForModel(requestPath, requestModel)
+}
+
+// playgroundRequestedGroup returns the group a playground request asked to use.
+// Chat historically sent it in JSON; Studio image/video send it in the body
+// and/or the New-Api-Group header. Non-playground routes ignore both.
+func playgroundRequestedGroup(path, bodyGroup, headerGroup string) string {
+	if !strings.HasPrefix(path, "/pg/") {
+		return ""
+	}
+	if bodyGroup != "" {
+		return bodyGroup
+	}
+	return headerGroup
 }
 
 // getModelFromRequest 从请求中读取模型信息
@@ -381,8 +385,13 @@ func getModelRequest(c *gin.Context) (*ModelRequest, bool, error) {
 		contentType := c.ContentType()
 		if slices.Contains([]string{gin.MIMEPOSTForm, gin.MIMEMultipartPOSTForm}, contentType) {
 			req, err := getModelFromRequest(c)
-			if err == nil && req.Model != "" {
-				modelRequest.Model = req.Model
+			if err == nil && req != nil {
+				if req.Model != "" {
+					modelRequest.Model = req.Model
+				}
+				if req.Group != "" {
+					modelRequest.Group = req.Group
+				}
 			}
 		}
 	}

@@ -37,6 +37,7 @@ export function buildImageRequestBody(
   return {
     model: payload.model,
     prompt: payload.prompt,
+    group: payload.group,
     n: payload.n || 1,
     size: payload.size || '1024x1024',
     // gpt-image 系列使用自己的参数面：quality 取值不同，也没有 style 与 response_format。
