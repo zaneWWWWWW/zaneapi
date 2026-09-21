@@ -44,6 +44,7 @@ export async function generateImage(
     const formData = new FormData()
     formData.append('prompt', payload.prompt)
     formData.append('model', payload.model)
+    if (payload.group) formData.append('group', payload.group)
     if (payload.size) formData.append('size', payload.size)
     if (payload.n) formData.append('n', String(payload.n))
 
