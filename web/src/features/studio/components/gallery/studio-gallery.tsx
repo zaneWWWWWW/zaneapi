@@ -25,7 +25,7 @@ import {
   Sparkles,
   Trash2,
 } from 'lucide-react'
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
 import { Button } from '@/components/ui/button'
@@ -37,6 +37,8 @@ import { VideoModal } from './video-modal'
 
 interface StudioGalleryProps {
   creations: CreationItem[]
+  imageEnabled?: boolean
+  videoEnabled?: boolean
   onDeleteCreation?: (id: string) => void
   onClearCreations?: () => void
   onReusePrompt?: (prompt: string, model: string, refImage?: string) => void
@@ -46,6 +48,9 @@ type FilterType = 'all' | 'image' | 'video'
 
 export function StudioGallery(props: StudioGalleryProps) {
   const { t } = useTranslation()
+  const imageEnabled = props.imageEnabled !== false
+  const videoEnabled = props.videoEnabled !== false
+  const showTypeFilters = imageEnabled && videoEnabled
   const [filter, setFilter] = useState<FilterType>('all')
   const [activeLightboxItem, setActiveLightboxItem] =
     useState<CreationItem | null>(null)
@@ -53,10 +58,20 @@ export function StudioGallery(props: StudioGalleryProps) {
     null
   )
 
+  useEffect(() => {
+    if (showTypeFilters) return
+    setFilter('all')
+  }, [showTypeFilters])
+
   const filteredItems = useMemo(() => {
-    if (filter === 'all') return props.creations
-    return props.creations.filter((item) => item.type === filter)
-  }, [filter, props.creations])
+    const visible = props.creations.filter((item) => {
+      if (item.type === 'image') return imageEnabled
+      if (item.type === 'video') return videoEnabled
+      return true
+    })
+    if (!showTypeFilters || filter === 'all') return visible
+    return visible.filter((item) => item.type === filter)
+  }, [filter, imageEnabled, props.creations, showTypeFilters, videoEnabled])
 
   return (
     <div className='flex h-full flex-col overflow-hidden bg-muted/10'>
@@ -73,44 +88,45 @@ export function StudioGallery(props: StudioGalleryProps) {
         </div>
 
         <div className='flex items-center gap-2'>
-          {/* Filter Pills */}
-          <div className='flex items-center rounded-lg border border-border/60 bg-muted/30 p-0.5 text-xs'>
-            <button
-              type='button'
-              onClick={() => setFilter('all')}
-              className={`rounded-md px-2.5 py-1 text-xs font-medium transition-all ${
-                filter === 'all'
-                  ? 'bg-background text-foreground shadow-xs'
-                  : 'text-muted-foreground hover:text-foreground'
-              }`}
-            >
-              {t('All')}
-            </button>
-            <button
-              type='button'
-              onClick={() => setFilter('image')}
-              className={`flex items-center gap-1 rounded-md px-2.5 py-1 text-xs font-medium transition-all ${
-                filter === 'image'
-                  ? 'bg-background text-foreground shadow-xs'
-                  : 'text-muted-foreground hover:text-foreground'
-              }`}
-            >
-              <ImageIcon className='size-3' />
-              <span>{t('Images')}</span>
-            </button>
-            <button
-              type='button'
-              onClick={() => setFilter('video')}
-              className={`flex items-center gap-1 rounded-md px-2.5 py-1 text-xs font-medium transition-all ${
-                filter === 'video'
-                  ? 'bg-background text-foreground shadow-xs'
-                  : 'text-muted-foreground hover:text-foreground'
-              }`}
-            >
-              <Clapperboard className='size-3' />
-              <span>{t('Videos')}</span>
-            </button>
-          </div>
+          {showTypeFilters ? (
+            <div className='flex items-center rounded-lg border border-border/60 bg-muted/30 p-0.5 text-xs'>
+              <button
+                type='button'
+                onClick={() => setFilter('all')}
+                className={`rounded-md px-2.5 py-1 text-xs font-medium transition-all ${
+                  filter === 'all'
+                    ? 'bg-background text-foreground shadow-xs'
+                    : 'text-muted-foreground hover:text-foreground'
+                }`}
+              >
+                {t('All')}
+              </button>
+              <button
+                type='button'
+                onClick={() => setFilter('image')}
+                className={`flex items-center gap-1 rounded-md px-2.5 py-1 text-xs font-medium transition-all ${
+                  filter === 'image'
+                    ? 'bg-background text-foreground shadow-xs'
+                    : 'text-muted-foreground hover:text-foreground'
+                }`}
+              >
+                <ImageIcon className='size-3' />
+                <span>{t('Images')}</span>
+              </button>
+              <button
+                type='button'
+                onClick={() => setFilter('video')}
+                className={`flex items-center gap-1 rounded-md px-2.5 py-1 text-xs font-medium transition-all ${
+                  filter === 'video'
+                    ? 'bg-background text-foreground shadow-xs'
+                    : 'text-muted-foreground hover:text-foreground'
+                }`}
+              >
+                <Clapperboard className='size-3' />
+                <span>{t('Videos')}</span>
+              </button>
+            </div>
+          ) : null}
 
           {/* Clear Button */}
           {props.creations.length > 0 && (
