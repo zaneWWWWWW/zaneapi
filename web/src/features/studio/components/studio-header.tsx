@@ -32,6 +32,8 @@ import type { GroupOption, StudioMode } from '../types'
 
 interface StudioHeaderProps {
   mode: StudioMode
+  imageEnabled?: boolean
+  videoEnabled?: boolean
   onModeChange: (mode: StudioMode) => void
   groups: GroupOption[]
   selectedGroup: string
@@ -40,36 +42,42 @@ interface StudioHeaderProps {
 
 export function StudioHeader(props: StudioHeaderProps) {
   const { t } = useTranslation()
+  const imageEnabled = props.imageEnabled !== false
+  const videoEnabled = props.videoEnabled !== false
+  const showModeSwitcher = imageEnabled && videoEnabled
 
   return (
     <div className='flex h-14 shrink-0 items-center justify-between border-b border-border/60 bg-background/80 px-4 backdrop-blur-md'>
-      {/* Mode Switcher Tabs */}
-      <div className='flex items-center rounded-lg border border-border/70 bg-muted/30 p-1'>
-        <button
-          type='button'
-          onClick={() => props.onModeChange('image')}
-          className={`flex items-center gap-2 rounded-md px-3.5 py-1.5 text-xs font-semibold transition-all ${
-            props.mode === 'image'
-              ? 'bg-background text-foreground shadow-xs'
-              : 'text-muted-foreground hover:text-foreground'
-          }`}
-        >
-          <ImageIcon className='size-3.5 text-primary' />
-          <span>{t('AI Image')}</span>
-        </button>
-        <button
-          type='button'
-          onClick={() => props.onModeChange('video')}
-          className={`flex items-center gap-2 rounded-md px-3.5 py-1.5 text-xs font-semibold transition-all ${
-            props.mode === 'video'
-              ? 'bg-background text-foreground shadow-xs'
-              : 'text-muted-foreground hover:text-foreground'
-          }`}
-        >
-          <Clapperboard className='size-3.5 text-primary' />
-          <span>{t('AI Video')}</span>
-        </button>
-      </div>
+      {showModeSwitcher ? (
+        <div className='flex items-center rounded-lg border border-border/70 bg-muted/30 p-1'>
+          <button
+            type='button'
+            onClick={() => props.onModeChange('image')}
+            className={`flex items-center gap-2 rounded-md px-3.5 py-1.5 text-xs font-semibold transition-all ${
+              props.mode === 'image'
+                ? 'bg-background text-foreground shadow-xs'
+                : 'text-muted-foreground hover:text-foreground'
+            }`}
+          >
+            <ImageIcon className='size-3.5 text-primary' />
+            <span>{t('AI Image')}</span>
+          </button>
+          <button
+            type='button'
+            onClick={() => props.onModeChange('video')}
+            className={`flex items-center gap-2 rounded-md px-3.5 py-1.5 text-xs font-semibold transition-all ${
+              props.mode === 'video'
+                ? 'bg-background text-foreground shadow-xs'
+                : 'text-muted-foreground hover:text-foreground'
+            }`}
+          >
+            <Clapperboard className='size-3.5 text-primary' />
+            <span>{t('AI Video')}</span>
+          </button>
+        </div>
+      ) : (
+        <div />
+      )}
 
       {/* Group Selector */}
       {props.groups.length > 0 && (

@@ -135,6 +135,7 @@ export interface ModelOption {
   value: string
   isPopular?: boolean
   type?: 'image' | 'video' | 'all'
+  successRate?: number
 }
 
 export interface GroupOption {

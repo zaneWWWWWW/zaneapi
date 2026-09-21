@@ -131,7 +131,7 @@ export function CreationCard(props: CreationCardProps) {
           </p>
           {item.failReason && (
             <p className='text-destructive/80 line-clamp-3 text-[11px] font-mono leading-tight'>
-              {item.failReason}
+              {t(item.failReason)}
             </p>
           )}
         </div>

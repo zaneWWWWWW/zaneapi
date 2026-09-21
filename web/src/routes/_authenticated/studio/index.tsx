@@ -17,24 +17,72 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 For commercial licensing, please contact support@quantumnous.com
 */
 import { createFileRoute, redirect } from '@tanstack/react-router'
+import z from 'zod'
 
 import { Main } from '@/components/layout'
 import { Studio } from '@/features/studio'
+import type { StudioMode } from '@/features/studio/types'
 import { isSidebarModuleEnabled } from '@/lib/nav-modules'
 
+const studioSearchSchema = z.object({
+  mode: z.enum(['image', 'video']).optional().catch(undefined),
+})
+
+function isStudioModeEnabled(mode: StudioMode): boolean {
+  if (mode === 'video') {
+    return isSidebarModuleEnabled('chat', 'studio-video')
+  }
+  return isSidebarModuleEnabled('chat', 'studio-image')
+}
+
 export const Route = createFileRoute('/_authenticated/studio/')({
-  beforeLoad: () => {
-    if (!isSidebarModuleEnabled('chat', 'studio')) {
+  validateSearch: studioSearchSchema,
+  beforeLoad: ({ search }) => {
+    const imageEnabled = isStudioModeEnabled('image')
+    const videoEnabled = isStudioModeEnabled('video')
+    if (!imageEnabled && !videoEnabled) {
       throw redirect({ to: '/dashboard' })
     }
+
+    if (search.mode === 'video') {
+      if (!videoEnabled) {
+        throw redirect({ to: '/studio', search: { mode: 'image' } })
+      }
+      return
+    }
+
+    if (search.mode === 'image') {
+      if (!imageEnabled) {
+        throw redirect({ to: '/studio', search: { mode: 'video' } })
+      }
+      return
+    }
+
+    throw redirect({
+      to: '/studio',
+      search: { mode: imageEnabled ? 'image' : 'video' },
+    })
   },
   component: StudioPage,
 })
 
 function StudioPage() {
+  const search = Route.useSearch()
+  const navigate = Route.useNavigate()
+  const mode: StudioMode = search.mode === 'video' ? 'video' : 'image'
+  const imageEnabled = isStudioModeEnabled('image')
+  const videoEnabled = isStudioModeEnabled('video')
+
   return (
     <Main className='p-0'>
-      <Studio />
+      <Studio
+        mode={mode}
+        imageEnabled={imageEnabled}
+        videoEnabled={videoEnabled}
+        onModeChange={(nextMode) => {
+          void navigate({ search: { mode: nextMode } })
+        }}
+      />
     </Main>
   )
 }
