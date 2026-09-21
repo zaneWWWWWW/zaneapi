@@ -110,4 +110,13 @@ describe('studio image generation request body', () => {
     assert.equal(body.n, 1)
     assert.equal(body.size, '1024x1024')
   })
+
+  test('includes the selected playground group in the request body', () => {
+    const body = wireBody({
+      model: 'gpt-image-2.5-flare-times',
+      prompt: 'p',
+      group: 'vip',
+    })
+    assert.equal(body.group, 'vip')
+  })
 })
