@@ -99,6 +99,8 @@ export function Studio(props: StudioProps) {
         <div className='flex-1 overflow-hidden'>
           <StudioGallery
             creations={state.creations}
+            imageEnabled={props.imageEnabled}
+            videoEnabled={props.videoEnabled}
             onDeleteCreation={state.deleteCreation}
             onClearCreations={state.clearCreations}
             onReusePrompt={handleReusePrompt}
