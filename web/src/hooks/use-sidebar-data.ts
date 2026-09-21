@@ -18,14 +18,15 @@ For commercial licensing, please contact support@quantumnous.com
 */
 import {
   Box,
+  Clapperboard,
   CreditCard,
   FileText,
   FlaskConical,
+  Image as ImageIcon,
   Key,
   LayoutDashboard,
   MessageSquare,
   Radio,
-  Sparkles,
   Store,
   Ticket,
   Trophy,
@@ -87,9 +88,18 @@ export function useSidebarData(): SidebarData {
     const mainItems: NavItem[] = [
       ...exploreItems,
       {
-        title: t('Studio'),
+        title: t('AI Image'),
         url: '/studio',
-        icon: Sparkles,
+        search: { mode: 'image' },
+        icon: ImageIcon,
+        configUrls: ['/studio/image'],
+      },
+      {
+        title: t('AI Video'),
+        url: '/studio',
+        search: { mode: 'video' },
+        icon: Clapperboard,
+        configUrls: ['/studio/video'],
       },
       {
         title: t('Playground'),

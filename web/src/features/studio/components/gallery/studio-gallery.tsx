@@ -20,6 +20,7 @@ For commercial licensing, please contact support@quantumnous.com
 import {
   Clapperboard,
   Image as ImageIcon,
+  Info,
   LayoutGrid,
   Sparkles,
   Trash2,
@@ -126,6 +127,15 @@ export function StudioGallery(props: StudioGalleryProps) {
             </Button>
           )}
         </div>
+      </div>
+
+      <div className='flex shrink-0 items-start gap-2 border-b border-border/60 bg-muted/20 px-4 py-2'>
+        <Info className='text-muted-foreground mt-0.5 size-3.5 shrink-0' />
+        <p className='text-muted-foreground text-[11px] leading-relaxed'>
+          {t(
+            'Generated images are stored only in this browser. Download them promptly after generation.'
+          )}
+        </p>
       </div>
 
       {/* Gallery Content Area */}
