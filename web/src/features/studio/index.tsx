@@ -24,9 +24,17 @@ import { StudioGallery } from './components/gallery/studio-gallery'
 import { StudioHeader } from './components/studio-header'
 import { VideoComingSoonPanel } from './components/video-coming-soon-panel'
 import { useStudioState } from './hooks/use-studio-state'
+import type { StudioMode } from './types'
 
-export function Studio() {
-  const state = useStudioState()
+interface StudioProps {
+  mode: StudioMode
+  imageEnabled: boolean
+  videoEnabled: boolean
+  onModeChange: (mode: StudioMode) => void
+}
+
+export function Studio(props: StudioProps) {
+  const state = useStudioState(props.mode)
 
   const handleReusePrompt = useCallback(
     (prompt: string, model: string, refImage?: string) => {
@@ -34,21 +42,23 @@ export function Studio() {
       if (refImage) {
         state.setReferenceImage(refImage)
       }
-      if (state.mode === 'image') {
+      if (props.mode === 'image') {
         state.setSelectedImageModel(model)
       } else {
         state.setSelectedVideoModel(model)
       }
     },
-    [state]
+    [props.mode, state]
   )
 
   return (
     <div className='flex h-[calc(100vh-var(--app-header-height,3.5rem))] w-full flex-col overflow-hidden bg-background'>
       {/* Top Header Bar */}
       <StudioHeader
-        mode={state.mode}
-        onModeChange={state.setMode}
+        mode={props.mode}
+        imageEnabled={props.imageEnabled}
+        videoEnabled={props.videoEnabled}
+        onModeChange={props.onModeChange}
         groups={state.groups}
         selectedGroup={state.selectedGroup}
         onGroupChange={state.setSelectedGroup}
@@ -58,7 +68,7 @@ export function Studio() {
       <div className='flex flex-1 flex-col overflow-hidden lg:flex-row'>
         {/* Left Creation Dock */}
         <div className='w-full shrink-0 border-r border-border/60 bg-card/40 lg:w-[380px] xl:w-[420px]'>
-          {state.mode === 'image' ? (
+          {props.mode === 'image' ? (
             <ImageStudioPanel
               models={state.currentAvailableModels}
               selectedModel={state.selectedImageModel}

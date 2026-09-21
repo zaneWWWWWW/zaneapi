@@ -20,6 +20,7 @@ import { useMemo } from 'react'
 
 import type { NavGroup, NavItem } from '@/components/layout/types'
 import {
+  migrateChatStudioModules,
   migrateSidebarModulesAdmin,
   SIDEBAR_MODULES_DEFAULT,
 } from '@/features/system-settings/maintenance/config'
@@ -69,7 +70,8 @@ const mergeWithDefaultSidebarModules = (
  * Mapping from URL to configuration keys
  */
 const URL_TO_CONFIG_MAP: Record<string, { section: string; module: string }> = {
-  '/studio': { section: 'chat', module: 'studio' },
+  '/studio/image': { section: 'chat', module: 'studio-image' },
+  '/studio/video': { section: 'chat', module: 'studio-video' },
   '/playground': { section: 'chat', module: 'playground' },
   '/dashboard': { section: 'console', module: 'detail' },
   '/dashboard/overview': { section: 'console', module: 'detail' },
@@ -133,6 +135,9 @@ function parseUserSidebarConfig(
   try {
     const parsed = JSON.parse(value) as SidebarModulesAdminConfig
     if (!parsed || typeof parsed !== 'object') return null
+    if (parsed.chat) {
+      parsed.chat = migrateChatStudioModules(parsed.chat)
+    }
     return parsed
   } catch {
     return null

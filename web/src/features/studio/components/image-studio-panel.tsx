@@ -29,6 +29,10 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
+import {
+  formatUptimePct,
+  getSuccessRateTextClass,
+} from '@/features/performance-metrics/lib/format'
 
 import { isDalle3 } from '../constants'
 import type { ImageAspectRatio, ImageQuality, ImageStyle, ModelOption } from '../types'
@@ -91,10 +95,19 @@ export function ImageStudioPanel(props: ImageStudioPanelProps) {
             <label className='text-muted-foreground text-xs font-medium'>
               {t('AI Model')}
             </label>
-            {isDalle && (
+            {isDalle ? (
               <span className='text-muted-foreground/80 flex items-center gap-1 text-[10px]'>
                 <Info className='size-3 text-amber-500' />
                 <span>{t('DALL-E 3 supports 1 image per request')}</span>
+              </span>
+            ) : (
+              <span
+                className='text-muted-foreground/80 text-[10px]'
+                title={t(
+                  'Average success rate over the last 24 hours.'
+                )}
+              >
+                {t('Avg. success (24h)')}
               </span>
             )}
           </div>
@@ -108,13 +121,23 @@ export function ImageStudioPanel(props: ImageStudioPanelProps) {
             <SelectContent>
               {props.models.map((m) => (
                 <SelectItem key={m.value} value={m.value} className='text-xs'>
-                  <div className='flex items-center gap-2'>
-                    <span>{m.label}</span>
-                    {m.isPopular && (
-                      <span className='rounded-xs bg-primary/10 px-1 py-0.2 text-[10px] text-primary font-medium'>
-                        {t('Popular')}
-                      </span>
-                    )}
+                  <div className='flex min-w-0 w-full items-center justify-between gap-3'>
+                    <span className='flex min-w-0 items-center gap-2'>
+                      <span className='truncate'>{m.label}</span>
+                      {m.isPopular && (
+                        <span className='rounded-xs bg-primary/10 px-1 py-0.2 text-[10px] text-primary font-medium'>
+                          {t('Popular')}
+                        </span>
+                      )}
+                    </span>
+                    <span
+                      className={`shrink-0 tabular-nums ${getSuccessRateTextClass(m.successRate ?? Number.NaN)}`}
+                      title={t(
+                        'Average success rate over the last 24 hours.'
+                      )}
+                    >
+                      {formatUptimePct(m.successRate ?? Number.NaN)}
+                    </span>
                   </div>
                 </SelectItem>
               ))}
@@ -251,6 +274,11 @@ export function ImageStudioPanel(props: ImageStudioPanelProps) {
 
       {/* Bottom Generate Button */}
       <div className='sticky bottom-0 mt-6 border-t border-border/60 bg-background/95 pt-3 backdrop-blur-xs'>
+        <p className='text-muted-foreground mb-2 text-[11px] leading-relaxed'>
+          {t(
+            'Generated images are stored only in this browser. Download them promptly after generation.'
+          )}
+        </p>
         <Button
           type='button'
           onClick={props.onGenerate}

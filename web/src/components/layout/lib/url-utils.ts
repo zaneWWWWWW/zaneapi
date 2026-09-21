@@ -38,6 +38,30 @@ function urlToString(url: LinkProps['to'] | (string & {})): string | null {
   return null
 }
 
+function searchToQuery(search?: Record<string, string | number | boolean | undefined>) {
+  if (!search) return ''
+  const params = new URLSearchParams()
+  for (const [key, value] of Object.entries(search)) {
+    if (value === undefined) continue
+    params.set(key, String(value))
+  }
+  const query = params.toString()
+  return query === '' ? '' : `?${query}`
+}
+
+function navItemHref(item: {
+  url?: LinkProps['to'] | (string & {})
+  search?: Record<string, string | number | boolean | undefined>
+}): string | null {
+  if (!item.url) return null
+  const base = urlToString(item.url)
+  if (!base) return null
+  const path = base.split('?')[0]
+  const query = searchToQuery(item.search)
+  if (query) return `${path}${query}`
+  return base
+}
+
 /**
  * Normalize URL by removing query parameters and trailing slashes
  */
@@ -87,14 +111,15 @@ export function checkIsActive(
         }
         return false
       })
-    )
+    ) {
       return true
+    }
   }
 
   // For regular link items, check the item's URL
   if (!item.url) return false
 
-  const itemUrl = urlToString(item.url)
+  const itemUrl = navItemHref(item)
   if (!itemUrl) return false
 
   // Exact match
@@ -102,13 +127,15 @@ export function checkIsActive(
 
   const itemUrlWithoutQuery = itemUrl.split('?')[0]
   const itemUrlHasQuery = itemUrl.includes('?')
+  const hrefQuery = href.includes('?') ? href.slice(href.indexOf('?')) : ''
+  const itemQuery = itemUrl.includes('?') ? itemUrl.slice(itemUrl.indexOf('?')) : ''
 
   // If both URLs have the same base path
-  if (hrefWithoutQuery === itemUrlWithoutQuery) {
+  if (normalizeHref(hrefWithoutQuery) === normalizeHref(itemUrlWithoutQuery)) {
     // If item.url has no query params, pathname match is enough (current URL may have query params)
     if (!itemUrlHasQuery) return true
     // If item.url has query params, they must match exactly
-    if (itemUrlHasQuery && href === itemUrl) return true
+    if (itemUrlHasQuery && hrefQuery === itemQuery) return true
   }
 
   // Main navigation match (matches first-level path)

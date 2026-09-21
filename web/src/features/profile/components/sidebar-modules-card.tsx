@@ -114,6 +114,20 @@ export function SidebarModulesCard() {
       },
       {
         section: 'chat',
+        key: 'studio-image',
+        title: t('AI Image'),
+        description: t('Create AI images with intuitive controls.'),
+        siteEnabled: isSiteModuleEnabled(siteModules, 'chat', ['studio-image']),
+      },
+      {
+        section: 'chat',
+        key: 'studio-video',
+        title: t('AI Video'),
+        description: t('Create cinematic AI videos with intuitive controls.'),
+        siteEnabled: isSiteModuleEnabled(siteModules, 'chat', ['studio-video']),
+      },
+      {
+        section: 'chat',
         key: 'playground',
         title: t('Playground'),
         description: t('AI model testing environment'),

@@ -21,6 +21,8 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
 
+import { getPerfMetricsSummary } from '@/features/performance-metrics/api'
+
 import {
   generateImage,
   generateVideo,
@@ -48,6 +50,8 @@ import type {
   VideoDuration,
   VideoResolution,
 } from '../types'
+import { reviveSavedCreations } from '../lib/creations-storage'
+import { attachModelSuccessRates } from '../lib/model-success-rate'
 import { useTaskPoller } from './use-task-poller'
 
 function loadSavedCreations(): CreationItem[] {
@@ -56,7 +60,8 @@ function loadSavedCreations(): CreationItem[] {
     const raw = window.localStorage.getItem(STUDIO_STORAGE_KEY)
     if (!raw) return []
     const parsed = JSON.parse(raw)
-    return Array.isArray(parsed) ? parsed : []
+    if (!Array.isArray(parsed)) return []
+    return reviveSavedCreations(parsed as CreationItem[])
   } catch {
     return []
   }
@@ -74,9 +79,8 @@ function saveCreations(items: CreationItem[]) {
   }
 }
 
-export function useStudioState() {
+export function useStudioState(mode: StudioMode) {
   const { t } = useTranslation()
-  const [mode, setMode] = useState<StudioMode>('image')
   const [prompt, setPrompt] = useState<string>('')
   const [negativePrompt, setNegativePrompt] = useState<string>('')
   const [selectedGroup, setSelectedGroup] = useState<string>(DEFAULT_GROUP)
@@ -140,10 +144,19 @@ export function useStudioState() {
 
   // Fetch available models whenever selectedGroup changes
   useEffect(() => {
-    getUserAvailableModels(selectedGroup)
-      .then((data) => {
-        setModels(data)
-        const imageMatches = data.filter(
+    let cancelled = false
+    Promise.all([
+      getUserAvailableModels(selectedGroup),
+      getPerfMetricsSummary(24).catch(() => null),
+    ])
+      .then(([data, summary]) => {
+        if (cancelled) return
+        const withRates = attachModelSuccessRates(
+          data,
+          summary?.data.models ?? []
+        )
+        setModels(withRates)
+        const imageMatches = withRates.filter(
           (m) => m.type === 'image' || m.type === 'all'
         )
         if (imageMatches.length > 0) {
@@ -153,7 +166,7 @@ export function useStudioState() {
             ) || imageMatches[0]
           setSelectedImageModel(preferred.value)
         }
-        const videoMatches = data.filter(
+        const videoMatches = withRates.filter(
           (m) => m.type === 'video' || m.type === 'all'
         )
         if (videoMatches.length > 0) {
@@ -165,6 +178,9 @@ export function useStudioState() {
         }
       })
       .catch(() => {})
+    return () => {
+      cancelled = true
+    }
   }, [selectedGroup])
 
   const [videoNoticeOpen, setVideoNoticeOpen] = useState<boolean>(false)
@@ -417,7 +433,11 @@ export function useStudioState() {
           setCreations((prev) => [...extraItems, ...prev])
         }
 
-        toast.success(t('Image generated successfully!'))
+        toast.success(t('Image generated successfully!'), {
+          description: t(
+            'Generated images are stored only in this browser. Download them promptly after generation.'
+          ),
+        })
       } else {
         updateCreation(tempId, {
           status: 'failed',
@@ -477,7 +497,6 @@ export function useStudioState() {
 
   return {
     mode,
-    setMode,
     prompt,
     setPrompt,
     negativePrompt,
