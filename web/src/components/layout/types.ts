@@ -48,6 +48,7 @@ type BaseNavItem = {
  */
 export type NavLink = BaseNavItem & {
   url: LinkProps['to'] | (string & {})
+  search?: Record<string, string | number | boolean | undefined>
   items?: never
   type?: never
   /** Open in a new tab instead of in-app routing. */

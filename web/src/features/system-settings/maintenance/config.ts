@@ -56,7 +56,8 @@ export const HEADER_NAV_DEFAULT: HeaderNavModulesConfig = {
 export const SIDEBAR_MODULES_DEFAULT: SidebarModulesAdminConfig = {
   chat: {
     enabled: true,
-    studio: true,
+    'studio-image': true,
+    'studio-video': true,
     playground: true,
     chat: true,
   },
@@ -97,14 +98,34 @@ export const SIDEBAR_SECTION_ORDER = [
   'system-settings',
 ] as const
 
+export function migrateChatStudioModules(
+  section: SidebarSectionConfig
+): SidebarSectionConfig {
+  const next: SidebarSectionConfig = { ...section }
+  if ('studio' in next) {
+    if (!('studio-image' in next)) {
+      next['studio-image'] = next.studio
+    }
+    if (!('studio-video' in next)) {
+      next['studio-video'] = next.studio
+    }
+    delete next.studio
+  }
+  return next
+}
+
 export function migrateSidebarModulesAdmin(
   config: SidebarModulesAdminConfig
 ): SidebarModulesAdminConfig {
-  if (config['system-settings']) return config
+  const next: SidebarModulesAdminConfig = { ...config }
+  if (next.chat) {
+    next.chat = migrateChatStudioModules(next.chat)
+  }
+  if (next['system-settings']) return next
   const enabled =
-    config.admin?.enabled !== false && config.admin?.setting !== false
+    next.admin?.enabled !== false && next.admin?.setting !== false
   return {
-    ...config,
+    ...next,
     'system-settings': {
       enabled,
       setting: enabled,

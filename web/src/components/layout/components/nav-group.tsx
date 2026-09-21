@@ -142,7 +142,11 @@ function SidebarMenuLink({ item, href }: { item: NavLink; href: string }) {
               onClick={() => setOpenMobile(false)}
             />
           ) : (
-            <Link to={item.url} onClick={() => setOpenMobile(false)} />
+            <Link
+              to={item.url}
+              search={item.search as never}
+              onClick={() => setOpenMobile(false)}
+            />
           )
         }
       >

@@ -16,6 +16,7 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 For commercial licensing, please contact support@quantumnous.com
 */
+import { parseSidebarModulesAdmin } from '@/features/system-settings/maintenance/config'
 import { getStatus } from '@/lib/api'
 
 export type ModuleAccess = { enabled: boolean; requireAuth: boolean }
@@ -202,20 +203,12 @@ export function isSidebarModuleEnabled(
   const status = getCachedStatus()
   if (!status) return true
 
-  const raw = status.SidebarModulesAdmin
-  if (!raw || String(raw).trim() === '') return true
-
-  try {
-    const parsed = JSON.parse(String(raw)) as Record<
-      string,
-      Record<string, boolean>
-    >
-    const sectionConfig = parsed[section]
-    if (!sectionConfig) return true
-    if (sectionConfig.enabled === false) return false
-    if (sectionConfig[module] === false) return false
-    return true
-  } catch {
-    return true
-  }
+  const parsed = parseSidebarModulesAdmin(
+    status.SidebarModulesAdmin as string | null | undefined
+  )
+  const sectionConfig = parsed[section]
+  if (!sectionConfig) return true
+  if (sectionConfig.enabled === false) return false
+  if (sectionConfig[module] === false) return false
+  return true
 }
