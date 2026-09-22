@@ -84,7 +84,7 @@ func Distribute() func(c *gin.Context) {
 				var selectGroup string
 				usingGroup := common.GetContextKeyString(c, constant.ContextKeyUsingGroup)
 				if playgroundGroup := playgroundRequestedGroup(c.Request.URL.Path, modelRequest.Group, c.GetHeader("New-Api-Group")); playgroundGroup != "" {
-					if !service.GroupInUserUsableGroups(usingGroup, playgroundGroup) && playgroundGroup != usingGroup {
+					if !playgroundGroupAccessible(c, usingGroup, playgroundGroup) {
 						abortWithOpenAiMessage(c, http.StatusForbidden, i18n.T(c, i18n.MsgDistributorGroupAccessDenied))
 						return
 					}
@@ -185,6 +185,30 @@ func playgroundRequestedGroup(path, bodyGroup, headerGroup string) string {
 		return bodyGroup
 	}
 	return headerGroup
+}
+
+// playgroundGroupAccessible reports whether a playground request may use the
+// selected group. The check is based on the user's group (and, if that context
+// value is empty, the user row), matching GET /api/user/self/groups.
+func playgroundGroupAccessible(c *gin.Context, usingGroup, playgroundGroup string) bool {
+	if playgroundGroup == "" {
+		return true
+	}
+	userGroup := common.GetContextKeyString(c, constant.ContextKeyUserGroup)
+	if userGroup == "" {
+		userGroup = usingGroup
+	}
+	if userGroup == "" {
+		if userID := c.GetInt("id"); userID > 0 {
+			if group, err := model.GetUserGroup(userID, false); err == nil {
+				userGroup = group
+			}
+		}
+	}
+	if playgroundGroup == userGroup || playgroundGroup == usingGroup {
+		return true
+	}
+	return service.GroupInUserUsableGroups(userGroup, playgroundGroup)
 }
 
 // getModelFromRequest 从请求中读取模型信息
@@ -363,6 +387,9 @@ func getModelRequest(c *gin.Context) (*ModelRequest, bool, error) {
 			return nil, false, err
 		}
 		modelRequest.Model = req.Model
+		if req.Group != "" {
+			modelRequest.Group = req.Group
+		}
 	}
 	if strings.HasPrefix(c.Request.URL.Path, "/v1/realtime") {
 		//wss://api.openai.com/v1/realtime?model=gpt-4o-realtime-preview-2024-10-01
