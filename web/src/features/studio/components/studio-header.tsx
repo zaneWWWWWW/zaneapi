@@ -17,27 +17,16 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 For commercial licensing, please contact support@quantumnous.com
 */
 
-import { Clapperboard, Image as ImageIcon, Layers } from 'lucide-react'
+import { Clapperboard, Image as ImageIcon } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select'
-
-import type { GroupOption, StudioMode } from '../types'
+import type { StudioMode } from '../types'
 
 interface StudioHeaderProps {
   mode: StudioMode
   imageEnabled?: boolean
   videoEnabled?: boolean
   onModeChange: (mode: StudioMode) => void
-  groups: GroupOption[]
-  selectedGroup: string
-  onGroupChange: (group: string) => void
 }
 
 export function StudioHeader(props: StudioHeaderProps) {
@@ -77,31 +66,6 @@ export function StudioHeader(props: StudioHeaderProps) {
         </div>
       ) : (
         <div />
-      )}
-
-      {/* Group Selector */}
-      {props.groups.length > 0 && (
-        <div className='flex items-center gap-2'>
-          <div className='flex items-center gap-1.5 text-xs text-muted-foreground'>
-            <Layers className='size-3.5' />
-            <span className='hidden sm:inline'>{t('Group')}:</span>
-          </div>
-          <Select
-            value={props.selectedGroup}
-            onValueChange={(v) => v !== null && props.onGroupChange(v)}
-          >
-            <SelectTrigger className='h-8 min-w-[110px] text-xs'>
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {props.groups.map((g) => (
-                <SelectItem key={g.value} value={g.value} className='text-xs'>
-                  {g.label} ({g.ratio}x)
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
       )}
     </div>
   )

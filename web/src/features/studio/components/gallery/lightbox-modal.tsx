@@ -30,6 +30,10 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog'
 
+import {
+  creationReferenceSrc,
+  downloadStudioImage,
+} from '../../lib/image-request'
 import type { CreationItem } from '../../types'
 
 interface LightboxModalProps {
@@ -56,13 +60,9 @@ export function LightboxModal(props: LightboxModalProps) {
   }
 
   const handleDownload = () => {
-    if (!displayUrl) return
-    const a = document.createElement('a')
-    a.href = displayUrl
-    a.download = `image-${item.id}.png`
-    document.body.appendChild(a)
-    a.click()
-    document.body.removeChild(a)
+    void downloadStudioImage(item).catch(() => {
+      toast.error(t('Download failed'))
+    })
   }
 
   return (
@@ -132,7 +132,11 @@ export function LightboxModal(props: LightboxModalProps) {
                 variant='outline'
                 onClick={() => {
                   props.onOpenChange(false)
-                  props.onReusePrompt?.(item.prompt, item.model, displayUrl)
+                  props.onReusePrompt?.(
+                    item.prompt,
+                    item.model,
+                    creationReferenceSrc(item)
+                  )
                 }}
                 className='w-full gap-1.5'
               >

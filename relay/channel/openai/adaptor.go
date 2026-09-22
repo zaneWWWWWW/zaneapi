@@ -11,6 +11,7 @@ import (
 	"net/textproto"
 	"net/url"
 	"path/filepath"
+	"sort"
 	"strings"
 
 	"github.com/QuantumNous/new-api/common"
@@ -476,28 +477,9 @@ func (a *Adaptor) ConvertImageRequest(c *gin.Context, info *relaycommon.RelayInf
 		}
 
 		if mf != nil && mf.File != nil {
-			// Check if "image" field exists in any form, including array notation
-			var imageFiles []*multipart.FileHeader
-			var exists bool
-
-			// First check for standard "image" field
-			if imageFiles, exists = mf.File["image"]; !exists || len(imageFiles) == 0 {
-				// If not found, check for "image[]" field
-				if imageFiles, exists = mf.File["image[]"]; !exists || len(imageFiles) == 0 {
-					// If still not found, iterate through all fields to find any that start with "image["
-					foundArrayImages := false
-					for fieldName, files := range mf.File {
-						if strings.HasPrefix(fieldName, "image[") && len(files) > 0 {
-							foundArrayImages = true
-							imageFiles = append(imageFiles, files...)
-						}
-					}
-
-					// If no image fields found at all
-					if !foundArrayImages && (len(imageFiles) == 0) {
-						return nil, errors.New("image is required")
-					}
-				}
+			imageFiles := collectImageEditFiles(mf)
+			if len(imageFiles) == 0 {
+				return nil, errors.New("image is required")
 			}
 
 			// Process all image files
@@ -581,7 +563,42 @@ func isJSONRequest(c *gin.Context) bool {
 	return strings.HasPrefix(c.Request.Header.Get("Content-Type"), "application/json")
 }
 
-// detectImageMimeType determines the MIME type based on the file extension
+func collectImageEditFiles(mf *multipart.Form) []*multipart.FileHeader {
+	if mf == nil || mf.File == nil {
+		return nil
+	}
+
+	var files []*multipart.FileHeader
+	seen := make(map[*multipart.FileHeader]struct{})
+	add := func(list []*multipart.FileHeader) {
+		for _, file := range list {
+			if file == nil {
+				continue
+			}
+			if _, ok := seen[file]; ok {
+				continue
+			}
+			seen[file] = struct{}{}
+			files = append(files, file)
+		}
+	}
+
+	add(mf.File["image"])
+	add(mf.File["image[]"])
+
+	var indexed []string
+	for name := range mf.File {
+		if strings.HasPrefix(name, "image[") && name != "image[]" {
+			indexed = append(indexed, name)
+		}
+	}
+	sort.Strings(indexed)
+	for _, name := range indexed {
+		add(mf.File[name])
+	}
+	return files
+}
+
 func detectImageMimeType(filename string) string {
 	ext := strings.ToLower(filepath.Ext(filename))
 	switch ext {
