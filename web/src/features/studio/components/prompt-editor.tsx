@@ -112,9 +112,9 @@ export function PromptEditor(props: PromptEditorProps) {
           value={currentInspiration?.id || ''}
           onValueChange={(v) => v !== null && handleSelectInspiration(v)}
         >
-          <SelectTrigger className='h-7.5 w-full border-none bg-muted/25 hover:bg-muted/40 text-xs px-2.5 shadow-none rounded-lg focus-visible:ring-0 focus:ring-0'>
-            <div className='flex items-center gap-1.5 truncate text-muted-foreground'>
-              <Lightbulb className='size-3.5 text-amber-500 shrink-0' />
+          <SelectTrigger className='h-7.5 w-full items-start border-none bg-muted/25 hover:bg-muted/40 text-xs px-2.5 shadow-none rounded-lg focus-visible:ring-0 focus:ring-0 text-left *:data-[slot=select-value]:items-start'>
+            <div className='flex min-w-0 items-start gap-1.5 truncate text-muted-foreground'>
+              <Lightbulb className='size-3.5 text-amber-500 mt-0.5 shrink-0' />
               <span className='text-muted-foreground/70 text-[11px] shrink-0'>
                 {t('Inspiration')}:
               </span>
@@ -125,7 +125,11 @@ export function PromptEditor(props: PromptEditorProps) {
               </span>
             </div>
           </SelectTrigger>
-          <SelectContent className='max-h-72 w-80'>
+          <SelectContent
+            align='start'
+            alignItemWithTrigger={false}
+            className='max-h-72 min-w-[var(--anchor-width)]'
+          >
             {inspirations.map((item: InspirationPrompt) => (
               <SelectItem
                 key={item.id}

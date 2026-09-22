@@ -18,7 +18,10 @@ For commercial licensing, please contact support@quantumnous.com
 */
 
 import { useCallback } from 'react'
+import { useTranslation } from 'react-i18next'
+import { toast } from 'sonner'
 
+import { MAX_STUDIO_REFERENCE_IMAGES } from './constants'
 import { ImageStudioPanel } from './components/image-studio-panel'
 import { StudioGallery } from './components/gallery/studio-gallery'
 import { StudioHeader } from './components/studio-header'
@@ -34,21 +37,38 @@ interface StudioProps {
 }
 
 export function Studio(props: StudioProps) {
+  const { t } = useTranslation()
   const state = useStudioState(props.mode)
 
   const handleReusePrompt = useCallback(
     (prompt: string, model: string, refImage?: string) => {
       state.setPrompt(prompt)
-      if (refImage) {
-        state.setReferenceImage(refImage)
-      }
       if (props.mode === 'image') {
         state.setSelectedImageModel(model)
       } else {
         state.setSelectedVideoModel(model)
+        if (refImage) {
+          state.setReferenceImage(refImage)
+        }
+        return
       }
+
+      if (!refImage) return
+      if (state.referenceImages.length >= MAX_STUDIO_REFERENCE_IMAGES) {
+        toast.error(
+          t('Maximum of {{count}} reference images', {
+            count: MAX_STUDIO_REFERENCE_IMAGES,
+          })
+        )
+        return
+      }
+
+      toast.success(t('Added as a reference image'))
+      void state.addReferenceFromSrc(refImage).catch(() => {
+        toast.error(t('Could not add this image as a reference'))
+      })
     },
-    [props.mode, state]
+    [props.mode, state, t]
   )
 
   return (
@@ -59,9 +79,6 @@ export function Studio(props: StudioProps) {
         imageEnabled={props.imageEnabled}
         videoEnabled={props.videoEnabled}
         onModeChange={props.onModeChange}
-        groups={state.groups}
-        selectedGroup={state.selectedGroup}
-        onGroupChange={state.setSelectedGroup}
       />
 
       {/* Main Studio Body: Left Creation Dock + Right Gallery */}
@@ -72,7 +89,11 @@ export function Studio(props: StudioProps) {
             <ImageStudioPanel
               models={state.currentAvailableModels}
               selectedModel={state.selectedImageModel}
-              onModelChange={state.setSelectedImageModel}
+              selectedGroup={state.selectedGroup}
+              onModelChange={(group, model) => {
+                state.setSelectedGroup(group)
+                state.setSelectedImageModel(model)
+              }}
               prompt={state.prompt}
               negativePrompt={state.negativePrompt}
               onPromptChange={state.setPrompt}
@@ -85,8 +106,8 @@ export function Studio(props: StudioProps) {
               onQualityChange={state.setImageQuality}
               style={state.imageStyle}
               onStyleChange={state.setImageStyle}
-              referenceImage={state.referenceImage}
-              onReferenceImageChange={state.setReferenceImage}
+              referenceImages={state.referenceImages}
+              onReferenceImagesChange={state.setReferenceImages}
               isGenerating={state.isGenerating}
               onGenerate={state.handleGenerate}
             />

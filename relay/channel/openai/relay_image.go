@@ -14,6 +14,7 @@ import (
 	"github.com/QuantumNous/new-api/dto"
 	"github.com/QuantumNous/new-api/logger"
 	relaycommon "github.com/QuantumNous/new-api/relay/common"
+	relayconstant "github.com/QuantumNous/new-api/relay/constant"
 	"github.com/QuantumNous/new-api/relay/helper"
 	"github.com/QuantumNous/new-api/service"
 	"github.com/QuantumNous/new-api/types"
@@ -88,6 +89,11 @@ func OpenaiImageHandler(c *gin.Context, info *relaycommon.RelayInfo, resp *http.
 // wantsOpenAIImageB64JSON reports whether the client expects data[].b64_json.
 // Codex ImageGen only parses b64_json and cannot send response_format.
 func wantsOpenAIImageB64JSON(info *relaycommon.RelayInfo) bool {
+	if info != nil && info.IsPlayground &&
+		(info.RelayMode == relayconstant.RelayModeImagesGenerations ||
+			info.RelayMode == relayconstant.RelayModeImagesEdits) {
+		return true
+	}
 	if info == nil || info.Request == nil {
 		return false
 	}

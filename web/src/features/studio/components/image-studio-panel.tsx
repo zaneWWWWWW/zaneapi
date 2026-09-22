@@ -18,7 +18,7 @@ For commercial licensing, please contact support@quantumnous.com
 */
 
 import { Info, Loader2, Sparkles, Wand2 } from 'lucide-react'
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
 import { Button } from '@/components/ui/button'
@@ -34,8 +34,23 @@ import {
   getSuccessRateTextClass,
 } from '@/features/performance-metrics/lib/format'
 
-import { isDalle3 } from '../constants'
-import type { ImageAspectRatio, ImageQuality, ImageStyle, ModelOption } from '../types'
+import {
+  isDalle3,
+  MAX_STUDIO_IMAGE_N,
+  PRESET_STUDIO_IMAGE_COUNTS,
+} from '../constants'
+import {
+  parseStudioModelKey,
+  renderStudioPriceLabel,
+  studioModelKey,
+} from '../lib/studio-models'
+import type {
+  ImageAspectRatio,
+  ImageQuality,
+  ImageStyle,
+  ModelOption,
+  StudioReferenceImage,
+} from '../types'
 import { AspectRatioPicker } from './aspect-ratio-picker'
 import { PromptEditor } from './prompt-editor'
 import { ReferenceImageUpload } from './reference-image-upload'
@@ -43,7 +58,8 @@ import { ReferenceImageUpload } from './reference-image-upload'
 interface ImageStudioPanelProps {
   models: ModelOption[]
   selectedModel: string
-  onModelChange: (model: string) => void
+  selectedGroup: string
+  onModelChange: (group: string, model: string) => void
   prompt: string
   negativePrompt: string
   onPromptChange: (val: string) => void
@@ -56,8 +72,8 @@ interface ImageStudioPanelProps {
   onQualityChange: (q: ImageQuality) => void
   style: ImageStyle
   onStyleChange: (s: ImageStyle) => void
-  referenceImage: string | null
-  onReferenceImageChange: (img: string | null) => void
+  referenceImages: StudioReferenceImage[]
+  onReferenceImagesChange: (images: StudioReferenceImage[]) => void
   isGenerating: boolean
   onGenerate: () => void
 }
@@ -65,6 +81,22 @@ interface ImageStudioPanelProps {
 export function ImageStudioPanel(props: ImageStudioPanelProps) {
   const { t } = useTranslation()
   const isDalle = isDalle3(props.selectedModel)
+  const isPresetCount = (
+    PRESET_STUDIO_IMAGE_COUNTS as readonly number[]
+  ).includes(props.imageCount)
+  const [customCountDraft, setCustomCountDraft] = useState('')
+  let customInputValue = customCountDraft
+  if (customCountDraft === '') {
+    customInputValue = isPresetCount ? '' : String(props.imageCount)
+  }
+  let customInputClass =
+    'border-transparent text-muted-foreground hover:border-border hover:text-foreground'
+  if (isDalle) {
+    customInputClass =
+      'border-transparent opacity-30 cursor-not-allowed text-muted-foreground'
+  } else if (!isPresetCount) {
+    customInputClass = 'border-primary bg-primary/10 text-primary shadow-xs'
+  }
 
   // Auto-adjust count if model is DALL-E 3
   useEffect(() => {
@@ -77,7 +109,11 @@ export function ImageStudioPanel(props: ImageStudioPanelProps) {
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
-        if (!props.isGenerating && props.prompt.trim()) {
+        if (
+          !props.isGenerating &&
+          props.prompt.trim() &&
+          props.selectedModel.trim()
+        ) {
           props.onGenerate()
         }
       }
@@ -112,32 +148,66 @@ export function ImageStudioPanel(props: ImageStudioPanelProps) {
             )}
           </div>
           <Select
-            value={props.selectedModel}
-            onValueChange={(v) => v !== null && props.onModelChange(v)}
+            value={
+              props.selectedModel
+                ? studioModelKey(props.selectedGroup, props.selectedModel)
+                : null
+            }
+            onValueChange={(v) => {
+              if (v === null) return
+              const selected = parseStudioModelKey(v)
+              props.onModelChange(selected.group, selected.model)
+            }}
           >
-            <SelectTrigger className='w-full text-xs font-medium'>
-              <SelectValue placeholder={t('Select Model')} />
+            <SelectTrigger className='h-auto min-h-9 w-full items-start py-1.5 text-left text-xs font-medium *:data-[slot=select-value]:items-start'>
+              <SelectValue
+                placeholder={t('Select the image model you want to use')}
+              />
             </SelectTrigger>
-            <SelectContent>
+            <SelectContent
+              align='start'
+              alignItemWithTrigger={false}
+              className='min-w-[var(--anchor-width)]'
+            >
               {props.models.map((m) => (
-                <SelectItem key={m.value} value={m.value} className='text-xs'>
-                  <div className='flex min-w-0 w-full items-center justify-between gap-3'>
-                    <span className='flex min-w-0 items-center gap-2'>
-                      <span className='truncate'>{m.label}</span>
-                      {m.isPopular && (
-                        <span className='rounded-xs bg-primary/10 px-1 py-0.2 text-[10px] text-primary font-medium'>
-                          {t('Popular')}
-                        </span>
-                      )}
-                    </span>
-                    <span
-                      className={`shrink-0 tabular-nums ${getSuccessRateTextClass(m.successRate ?? Number.NaN)}`}
-                      title={t(
-                        'Average success rate over the last 24 hours.'
-                      )}
-                    >
-                      {formatUptimePct(m.successRate ?? Number.NaN)}
-                    </span>
+                <SelectItem
+                  key={studioModelKey(m.group || '', m.value)}
+                  value={studioModelKey(m.group || '', m.value)}
+                  className='text-xs'
+                >
+                  <div className='flex min-w-0 w-full flex-col gap-0.5 py-0.5'>
+                    <div className='flex min-w-0 items-center justify-between gap-3'>
+                      <span className='flex min-w-0 items-center gap-2'>
+                        <span className='truncate font-medium'>{m.label}</span>
+                        {m.isPopular && (
+                          <span className='rounded-xs bg-primary/10 px-1 py-0.2 text-[10px] text-primary font-medium'>
+                            {t('Popular')}
+                          </span>
+                        )}
+                      </span>
+                      <span
+                        className={`shrink-0 tabular-nums ${getSuccessRateTextClass(m.successRate ?? Number.NaN)}`}
+                        title={t(
+                          'Average success rate over the last 24 hours.'
+                        )}
+                      >
+                        {formatUptimePct(m.successRate ?? Number.NaN)}
+                      </span>
+                    </div>
+                    <div className='text-muted-foreground flex min-w-0 items-center gap-1.5 text-[10px]'>
+                      <span className='truncate'>
+                        {t('Group')}: {m.group || '-'}
+                        {m.groupRatio !== undefined ? ` (${m.groupRatio}x)` : ''}
+                      </span>
+                      {m.priceDisplay ? (
+                        <>
+                          <span>·</span>
+                          <span className='shrink-0 tabular-nums'>
+                            {renderStudioPriceLabel(m.priceDisplay, t)}
+                          </span>
+                        </>
+                      ) : null}
+                    </div>
                   </div>
                 </SelectItem>
               ))}
@@ -168,8 +238,8 @@ export function ImageStudioPanel(props: ImageStudioPanelProps) {
             <label className='text-muted-foreground text-xs font-medium'>
               {t('Batch Count')}
             </label>
-            <div className='grid grid-cols-4 gap-1 rounded-lg border border-border/60 p-1 bg-muted/20'>
-              {[1, 2, 3, 4].map((count) => {
+            <div className='grid grid-cols-5 gap-1 rounded-lg border border-border/60 p-1 bg-muted/20'>
+              {PRESET_STUDIO_IMAGE_COUNTS.map((count) => {
                 const disabled = isDalle && count > 1
                 const selected = props.imageCount === count
                 let stateClass =
@@ -187,13 +257,55 @@ export function ImageStudioPanel(props: ImageStudioPanelProps) {
                     type='button'
                     disabled={disabled}
                     aria-pressed={selected}
-                    onClick={() => props.onImageCountChange(count)}
+                    onClick={() => {
+                      setCustomCountDraft('')
+                      props.onImageCountChange(count)
+                    }}
                     className={`rounded-md border py-1 text-xs font-medium transition-all ${stateClass}`}
                   >
                     {count}
                   </button>
                 )
               })}
+              <input
+                type='text'
+                inputMode='numeric'
+                pattern='[0-9]*'
+                maxLength={3}
+                disabled={isDalle}
+                aria-label={t('Custom batch count')}
+                placeholder='n'
+                value={customInputValue}
+                onChange={(e) => {
+                  const next = e.target.value.replaceAll(/\D/g, '')
+                  setCustomCountDraft(next)
+                  const parsed = Number.parseInt(next, 10)
+                  if (
+                    Number.isFinite(parsed) &&
+                    parsed >= 1 &&
+                    parsed <= MAX_STUDIO_IMAGE_N
+                  ) {
+                    props.onImageCountChange(parsed)
+                  }
+                }}
+                onBlur={() => {
+                  const parsed = Number.parseInt(customCountDraft, 10)
+                  if (!Number.isFinite(parsed) || parsed < 1) {
+                    setCustomCountDraft(isPresetCount ? '' : String(props.imageCount))
+                    return
+                  }
+                  const clamped = Math.min(MAX_STUDIO_IMAGE_N, parsed)
+                  props.onImageCountChange(clamped)
+                  setCustomCountDraft(
+                    (PRESET_STUDIO_IMAGE_COUNTS as readonly number[]).includes(
+                      clamped
+                    )
+                      ? ''
+                      : String(clamped)
+                  )
+                }}
+                className={`rounded-md border bg-transparent py-1 text-center text-xs font-medium tabular-nums outline-none transition-all placeholder:text-muted-foreground/70 ${customInputClass}`}
+              />
             </div>
           </div>
 
@@ -266,9 +378,9 @@ export function ImageStudioPanel(props: ImageStudioPanelProps) {
         {/* Reference Image Uploader (Expanded height) */}
         <ReferenceImageUpload
           label={t('Reference Image / Image-to-Image (Optional)')}
-          description={t('Upload reference image to guide style or structure')}
-          referenceImage={props.referenceImage}
-          onImageChange={props.onReferenceImageChange}
+          description={t('Upload reference images to guide style or structure')}
+          items={props.referenceImages}
+          onItemsChange={props.onReferenceImagesChange}
         />
       </div>
 
@@ -282,7 +394,11 @@ export function ImageStudioPanel(props: ImageStudioPanelProps) {
         <Button
           type='button'
           onClick={props.onGenerate}
-          disabled={props.isGenerating || !props.prompt.trim()}
+          disabled={
+            props.isGenerating ||
+            !props.prompt.trim() ||
+            !props.selectedModel.trim()
+          }
           className='w-full gap-2 rounded-lg py-5 text-sm font-semibold shadow-md'
         >
           {props.isGenerating ? (

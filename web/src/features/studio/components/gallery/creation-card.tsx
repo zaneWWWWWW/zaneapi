@@ -32,6 +32,10 @@ import { toast } from 'sonner'
 import { Progress } from '@/components/ui/progress'
 import { Spinner } from '@/components/ui/spinner'
 
+import {
+  creationReferenceSrc,
+  downloadStudioImage,
+} from '../../lib/image-request'
 import type { CreationItem } from '../../types'
 
 interface CreationCardProps {
@@ -54,15 +58,21 @@ export function CreationCard(props: CreationCardProps) {
 
   const handleDownload = (e: React.MouseEvent) => {
     e.stopPropagation()
-    const targetUrl = item.url || (item.b64Json ? `data:image/png;base64,${item.b64Json}` : '')
-    if (!targetUrl) return
-
-    const a = document.createElement('a')
-    a.href = targetUrl
-    a.download = `${item.type}-${item.id}.${item.type === 'video' ? 'mp4' : 'png'}`
-    document.body.appendChild(a)
-    a.click()
-    document.body.removeChild(a)
+    if (item.type === 'video') {
+      const targetUrl = item.url || ''
+      if (!targetUrl) return
+      const a = document.createElement('a')
+      a.href = targetUrl
+      a.download = `video-${item.id}.mp4`
+      a.rel = 'noopener'
+      document.body.appendChild(a)
+      a.click()
+      document.body.removeChild(a)
+      return
+    }
+    void downloadStudioImage(item).catch(() => {
+      toast.error(t('Download failed'))
+    })
   }
 
   // Render In-Progress or Queued Card
@@ -241,7 +251,11 @@ export function CreationCard(props: CreationCardProps) {
                 type='button'
                 onClick={(e) => {
                   e.stopPropagation()
-                  props.onReusePrompt?.(item.prompt, item.model, displayUrl)
+                  props.onReusePrompt?.(
+                    item.prompt,
+                    item.model,
+                    creationReferenceSrc(item)
+                  )
                 }}
                 className='flex items-center gap-1 text-[11px] font-medium text-primary hover:underline'
               >
