@@ -22,6 +22,22 @@ import (
 	"github.com/tidwall/sjson"
 )
 
+// shouldPassThroughImageBody reports whether the raw client image body can be
+// forwarded upstream. Gemini image models convert OpenAI JSON/multipart into
+// generateContent JSON; passing the original multipart through with a JSON
+// Content-Type makes the upstream reject the body as "expected object at byte 0".
+func shouldPassThroughImageBody(info *relaycommon.RelayInfo) bool {
+	if info == nil || info.ChannelMeta == nil {
+		return false
+	}
+	switch info.ChannelType {
+	case constant.ChannelTypeAgnesAI, constant.ChannelTypeVyceAI, constant.ChannelTypeGemini:
+		return false
+	}
+	return model_setting.GetGlobalSettings().PassThroughRequestEnabled ||
+		info.ChannelSetting.PassThroughBodyEnabled
+}
+
 func ImageHelper(c *gin.Context, info *relaycommon.RelayInfo) (newAPIError *types.NewAPIError) {
 	info.InitChannelMeta(c)
 
@@ -57,11 +73,7 @@ func ImageHelper(c *gin.Context, info *relaycommon.RelayInfo) (newAPIError *type
 
 	var requestBody io.Reader
 
-	passThrough := (model_setting.GetGlobalSettings().PassThroughRequestEnabled || info.ChannelSetting.PassThroughBodyEnabled) &&
-		info.ChannelType != constant.ChannelTypeAgnesAI &&
-		info.ChannelType != constant.ChannelTypeVyceAI
-
-	if passThrough {
+	if shouldPassThroughImageBody(info) {
 		storage, err := common.GetBodyStorage(c)
 		if err != nil {
 			return types.NewErrorWithStatusCode(err, types.ErrorCodeReadRequestBodyFailed, http.StatusBadRequest, types.ErrOptionWithSkipRetry())
