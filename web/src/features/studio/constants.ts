@@ -28,6 +28,10 @@ import type {
 
 export const STUDIO_STORAGE_KEY = 'zaneapi_studio_creations_v1'
 export const STUDIO_VIDEO_WARNED_KEY = 'zaneapi_studio_video_warned_v1'
+export const MAX_STUDIO_REFERENCE_IMAGES = 8
+export const MAX_STUDIO_REFERENCE_IMAGE_BYTES = 15 * 1024 * 1024
+export const MAX_STUDIO_IMAGE_N = 128
+export const PRESET_STUDIO_IMAGE_COUNTS = [1, 2, 3, 4] as const
 
 export const DEFAULT_GROUP = 'default' as const
 

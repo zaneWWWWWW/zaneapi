@@ -17,10 +17,19 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 For commercial licensing, please contact support@quantumnous.com
 */
 
+import { getPerfMetricsSummary } from '@/features/performance-metrics/api'
+import { getPricing } from '@/features/pricing/api'
 import { api } from '@/lib/api'
 
 import { POPULAR_IMAGE_MODELS, POPULAR_VIDEO_MODELS } from './constants'
-import { buildImageRequestBody } from './lib/image-request'
+
+import {
+  buildImageRequestBody,
+  collectStudioReferenceImages,
+  referenceImageFilename,
+} from './lib/image-request'
+import { attachModelSuccessRates } from './lib/model-success-rate'
+import { buildStudioImageOptions } from './lib/studio-models'
 import type {
   GroupOption,
   ImageGenerationRequest,
@@ -39,8 +48,14 @@ export async function generateImage(
     headers['New-Api-Group'] = payload.group
   }
 
-  // If reference image exists, convert base64/dataURL to blob and submit to /pg/images/edits
-  if (payload.image && payload.image.startsWith('data:')) {
+  const imageFiles =
+    payload.imageFiles?.filter((file) => file && file.size > 0) ?? []
+  const referenceImages =
+    imageFiles.length > 0 ? [] : collectStudioReferenceImages(payload)
+  const referenceCount = imageFiles.length > 0 ? imageFiles.length : referenceImages.length
+
+  // If reference images exist, convert data URLs to blobs and submit to /pg/images/edits
+  if (referenceCount > 0) {
     const formData = new FormData()
     formData.append('prompt', payload.prompt)
     formData.append('model', payload.model)
@@ -48,16 +63,27 @@ export async function generateImage(
     if (payload.size) formData.append('size', payload.size)
     if (payload.n) formData.append('n', String(payload.n))
 
-    const response = await fetch(payload.image)
-    const blob = await response.blob()
-    formData.append('image', blob, 'reference.png')
+    const fieldName = referenceCount > 1 ? 'image[]' : 'image'
+    headers['X-Studio-Reference-Count'] = String(referenceCount)
+    if (imageFiles.length > 0) {
+      for (const [index, file] of imageFiles.entries()) {
+        formData.append(
+          fieldName,
+          file,
+          file.name || referenceImageFilename(index, file.type)
+        )
+      }
+    } else {
+      for (const [index, src] of referenceImages.entries()) {
+        const response = await fetch(src)
+        const blob = await response.blob()
+        formData.append(fieldName, blob, referenceImageFilename(index, blob.type))
+      }
+    }
 
     const res = await api.post('/pg/images/edits', formData, {
       signal,
-      headers: {
-        ...headers,
-        'Content-Type': 'multipart/form-data',
-      },
+      headers,
       skipErrorHandler: true,
     } as Record<string, unknown>)
     return res.data
@@ -164,6 +190,38 @@ export async function getUserAvailableModels(
         (POPULAR_VIDEO_MODELS as readonly string[]).includes(model),
     }
   })
+}
+
+export async function loadStudioImageModels(): Promise<{
+  groups: GroupOption[]
+  models: ModelOption[]
+}> {
+  const groups = await getUserGroups()
+  const [pricing, summary, modelsByGroup] = await Promise.all([
+    getPricing().catch(() => null),
+    getPerfMetricsSummary(24).catch(() => null),
+    Promise.all(
+      groups.map(async (group) => ({
+        group: group.value,
+        models: await getUserAvailableModels(group.value),
+      }))
+    ),
+  ])
+
+  const options = attachModelSuccessRates(
+    buildStudioImageOptions({
+      groups,
+      modelsByGroup,
+      pricingModels: pricing?.data ?? [],
+      groupRatio: {
+        ...Object.fromEntries(groups.map((group) => [group.value, group.ratio])),
+        ...pricing?.group_ratio,
+      },
+    }),
+    summary?.data.models ?? []
+  )
+
+  return { groups, models: options }
 }
 
 export async function getUserGroups(): Promise<GroupOption[]> {

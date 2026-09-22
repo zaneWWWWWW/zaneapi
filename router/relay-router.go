@@ -62,11 +62,14 @@ func SetRelayRouter(router *gin.Engine) {
 	playgroundRouter := router.Group("/pg")
 	playgroundRouter.Use(middleware.RouteTag("relay"))
 	playgroundRouter.Use(middleware.SystemPerformanceCheck())
-	playgroundRouter.Use(middleware.UserAuth(), middleware.Distribute())
+	playgroundRouter.Use(middleware.UserAuth())
+	playgroundRouter.GET("/images/file", controller.PlaygroundImageFile)
 	{
-		playgroundRouter.POST("/chat/completions", controller.Playground)
-		playgroundRouter.POST("/images/generations", controller.PlaygroundImage)
-		playgroundRouter.POST("/images/edits", controller.PlaygroundImage)
+		playgroundRelay := playgroundRouter.Group("")
+		playgroundRelay.Use(middleware.Distribute())
+		playgroundRelay.POST("/chat/completions", controller.Playground)
+		playgroundRelay.POST("/images/generations", controller.PlaygroundImage)
+		playgroundRelay.POST("/images/edits", controller.PlaygroundImage)
 		// 生视频能力暂未开放（前端为「敬请期待」占位），视频接口在 feat/studio-video 分支注册
 	}
 	relayV1Router := router.Group("/v1")

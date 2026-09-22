@@ -83,6 +83,43 @@ func TestConvertImageEditRequestMultipart(t *testing.T) {
 		convertAndReplay(t, c, prompt)
 	})
 
+	t.Run("forwards every reference image as image[]", func(t *testing.T) {
+		var body bytes.Buffer
+		writer := multipart.NewWriter(&body)
+		require.NoError(t, writer.WriteField("model", "gpt-image-2"))
+		require.NoError(t, writer.WriteField("prompt", "merge both photos"))
+		first, err := writer.CreateFormFile("image", "reference-1.jpg")
+		require.NoError(t, err)
+		_, err = first.Write([]byte("dog"))
+		require.NoError(t, err)
+		second, err := writer.CreateFormFile("image[]", "reference-2.jpg")
+		require.NoError(t, err)
+		_, err = second.Write([]byte("couple"))
+		require.NoError(t, err)
+		require.NoError(t, writer.Close())
+
+		c, _ := gin.CreateTestContext(httptest.NewRecorder())
+		c.Request = httptest.NewRequest(http.MethodPost, "/v1/images/edits", &body)
+		c.Request.Header.Set("Content-Type", writer.FormDataContentType())
+		require.NoError(t, c.Request.ParseMultipartForm(32<<20))
+
+		converted, err := (&Adaptor{}).ConvertImageRequest(c, &relaycommon.RelayInfo{
+			RelayMode: relayconstant.RelayModeImagesEdits,
+		}, dto.ImageRequest{Model: "gpt-image-2", Prompt: "merge both photos"})
+		require.NoError(t, err)
+		convertedBody, ok := converted.(*bytes.Buffer)
+		require.True(t, ok)
+
+		replayedRequest := httptest.NewRequest(http.MethodPost, "/v1/images/edits", bytes.NewReader(convertedBody.Bytes()))
+		replayedRequest.Header.Set("Content-Type", c.Request.Header.Get("Content-Type"))
+		require.NoError(t, replayedRequest.ParseMultipartForm(32<<20))
+
+		require.Empty(t, replayedRequest.MultipartForm.File["image"])
+		require.Len(t, replayedRequest.MultipartForm.File["image[]"], 2)
+		require.Equal(t, "reference-1.jpg", replayedRequest.MultipartForm.File["image[]"][0].Filename)
+		require.Equal(t, "reference-2.jpg", replayedRequest.MultipartForm.File["image[]"][1].Filename)
+	})
+
 	t.Run("re-parses reusable body when form is missing", func(t *testing.T) {
 		prompt := "edit without pre-parsed form"
 		c := newMultipartContext(t, prompt)

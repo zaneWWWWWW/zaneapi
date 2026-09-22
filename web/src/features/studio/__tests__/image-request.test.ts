@@ -19,7 +19,13 @@ For commercial licensing, please contact support@quantumnous.com
 import assert from 'node:assert/strict'
 import { describe, test } from 'node:test'
 
-import { buildImageRequestBody } from '../lib/image-request'
+import {
+  blobFromDataUrl,
+  buildImageRequestBody,
+  collectStudioReferenceImages,
+  creationReferenceSrc,
+  referenceImageFilename,
+} from '../lib/image-request'
 
 // 线上可见的请求体是 JSON 序列化结果，undefined 字段不会被发送；
 // structuredClone 会保留 undefined 字段，无法表达线上格式，这里必须走 JSON。
@@ -109,6 +115,45 @@ describe('studio image generation request body', () => {
     // Assert
     assert.equal(body.n, 1)
     assert.equal(body.size, '1024x1024')
+  })
+
+  test('prefers local base64 over a remote url for remix', () => {
+    assert.equal(
+      creationReferenceSrc({
+        url: 'https://cdn.example/a.png',
+        b64Json: 'abc',
+      }),
+      'data:image/png;base64,abc'
+    )
+  })
+
+  test('decodes a data URL without fetch', () => {
+    const blob = blobFromDataUrl('data:image/png;base64,AQID')
+    assert.equal(blob.type, 'image/png')
+    assert.equal(blob.size, 3)
+  })
+
+  test('names reference files from the blob mime type', () => {
+    assert.equal(referenceImageFilename(0, 'image/jpeg'), 'reference-1.jpg')
+    assert.equal(referenceImageFilename(1, 'image/webp'), 'reference-2.webp')
+    assert.equal(referenceImageFilename(2, 'image/png'), 'reference-3.png')
+  })
+
+  test('collects unique data-URI reference images for edits', () => {
+    const images = collectStudioReferenceImages({
+      model: 'gpt-image-2',
+      prompt: 'p',
+      image: 'data:image/png;base64,aaa',
+      images: [
+        'data:image/png;base64,bbb',
+        'https://example.com/skip.png',
+        'data:image/png;base64,aaa',
+      ],
+    })
+    assert.deepEqual(images, [
+      'data:image/png;base64,bbb',
+      'data:image/png;base64,aaa',
+    ])
   })
 
   test('includes the selected playground group in the request body', () => {

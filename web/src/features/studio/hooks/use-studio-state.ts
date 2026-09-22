@@ -17,23 +17,20 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 For commercial licensing, please contact support@quantumnous.com
 */
 
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
-
-import { getPerfMetricsSummary } from '@/features/performance-metrics/api'
 
 import {
   generateImage,
   generateVideo,
-  getUserAvailableModels,
-  getUserGroups,
+  loadStudioImageModels,
 } from '../api'
 import {
   DEFAULT_GROUP,
   IMAGE_RATIO_OPTIONS,
-  POPULAR_IMAGE_MODELS,
   POPULAR_VIDEO_MODELS,
+  MAX_STUDIO_REFERENCE_IMAGES,
   STUDIO_STORAGE_KEY,
   STUDIO_VIDEO_WARNED_KEY,
 } from '../constants'
@@ -46,12 +43,13 @@ import type {
   ImageStyle,
   ModelOption,
   StudioMode,
+  StudioReferenceImage,
   VideoAspectRatio,
   VideoDuration,
   VideoResolution,
 } from '../types'
 import { reviveSavedCreations } from '../lib/creations-storage'
-import { attachModelSuccessRates } from '../lib/model-success-rate'
+import { studioReferenceImageFromSrc } from '../lib/image-request'
 import { useTaskPoller } from './use-task-poller'
 
 function loadSavedCreations(): CreationItem[] {
@@ -87,9 +85,7 @@ export function useStudioState(mode: StudioMode) {
   const [models, setModels] = useState<ModelOption[]>([])
   const [groups, setGroups] = useState<GroupOption[]>([])
 
-  const [selectedImageModel, setSelectedImageModel] = useState<string>(
-    POPULAR_IMAGE_MODELS[0]
-  )
+  const [selectedImageModel, setSelectedImageModel] = useState<string>('')
   const [selectedVideoModel, setSelectedVideoModel] = useState<string>(
     POPULAR_VIDEO_MODELS[0]
   )
@@ -105,6 +101,12 @@ export function useStudioState(mode: StudioMode) {
   const [imageQuality, setImageQuality] = useState<ImageQuality>('standard')
   const [imageStyle, setImageStyle] = useState<ImageStyle>('vivid')
   const [referenceImage, setReferenceImage] = useState<string | null>(null)
+  const [referenceImages, setReferenceImages] = useState<StudioReferenceImage[]>(
+    []
+  )
+  const referenceImagesRef = useRef<StudioReferenceImage[]>([])
+  referenceImagesRef.current = referenceImages
+  const pendingReferenceFiles = useRef(new Map<string, Promise<File>>())
   const [lastFrameImage, setLastFrameImage] = useState<string | null>(null)
 
   const [creations, setCreations] = useState<CreationItem[]>(() =>
@@ -130,58 +132,20 @@ export function useStudioState(mode: StudioMode) {
   // Poller for in-progress video tasks
   useTaskPoller({ creations, updateCreation })
 
-  // Fetch user groups on mount
-  useEffect(() => {
-    getUserGroups()
-      .then((data) => {
-        setGroups(data)
-        if (data.length > 0 && !data.some((g) => g.value === selectedGroup)) {
-          setSelectedGroup(data[0].value)
-        }
-      })
-      .catch(() => {})
-  }, [selectedGroup])
-
-  // Fetch available models whenever selectedGroup changes
+  // Load image models across all usable groups once
   useEffect(() => {
     let cancelled = false
-    Promise.all([
-      getUserAvailableModels(selectedGroup),
-      getPerfMetricsSummary(24).catch(() => null),
-    ])
-      .then(([data, summary]) => {
+    loadStudioImageModels()
+      .then(({ groups: nextGroups, models: nextModels }) => {
         if (cancelled) return
-        const withRates = attachModelSuccessRates(
-          data,
-          summary?.data.models ?? []
-        )
-        setModels(withRates)
-        const imageMatches = withRates.filter(
-          (m) => m.type === 'image' || m.type === 'all'
-        )
-        if (imageMatches.length > 0) {
-          const preferred =
-            imageMatches.find((m) =>
-              (POPULAR_IMAGE_MODELS as readonly string[]).includes(m.value)
-            ) || imageMatches[0]
-          setSelectedImageModel(preferred.value)
-        }
-        const videoMatches = withRates.filter(
-          (m) => m.type === 'video' || m.type === 'all'
-        )
-        if (videoMatches.length > 0) {
-          const preferred =
-            videoMatches.find((m) =>
-              (POPULAR_VIDEO_MODELS as readonly string[]).includes(m.value)
-            ) || videoMatches[0]
-          setSelectedVideoModel(preferred.value)
-        }
+        setGroups(nextGroups)
+        setModels(nextModels)
       })
       .catch(() => {})
     return () => {
       cancelled = true
     }
-  }, [selectedGroup])
+  }, [])
 
   const [videoNoticeOpen, setVideoNoticeOpen] = useState<boolean>(false)
 
@@ -348,6 +312,10 @@ export function useStudioState(mode: StudioMode) {
       toast.error(t('Please enter a prompt for generation'))
       return
     }
+    if (mode === 'image' && !selectedImageModel.trim()) {
+      toast.error(t('Please select an image model'))
+      return
+    }
 
     if (mode === 'video') {
       const warned =
@@ -391,7 +359,18 @@ export function useStudioState(mode: StudioMode) {
         n: imageCount,
         quality: imageQuality,
         style: imageStyle,
-        image: referenceImage || undefined,
+        imageFiles: await Promise.all(
+          referenceImagesRef.current.map(async (item) => {
+            if (item.file && item.file.size > 0) {
+              return item.file
+            }
+            const pending = pendingReferenceFiles.current.get(item.id)
+            if (!pending) {
+              throw new Error(t('Could not add this image as a reference'))
+            }
+            return pending
+          })
+        ),
         group: selectedGroup,
       })
 
@@ -477,12 +456,47 @@ export function useStudioState(mode: StudioMode) {
     mode,
     negativePrompt,
     prompt,
-    referenceImage,
     selectedGroup,
     selectedImageModel,
     t,
     updateCreation,
   ])
+
+  const addReferenceFromSrc = useCallback(async (src: string) => {
+    if (referenceImagesRef.current.length >= MAX_STUDIO_REFERENCE_IMAGES) {
+      throw new Error('max')
+    }
+    const id = `remix-${Date.now()}-${Math.random().toString(36).slice(2)}`
+    const placeholder: StudioReferenceImage = { id, preview: src }
+    const next = [...referenceImagesRef.current, placeholder]
+    referenceImagesRef.current = next
+    setReferenceImages(next)
+
+    const pending = studioReferenceImageFromSrc(src, 'remix.png')
+      .then((ready) => {
+        URL.revokeObjectURL(ready.preview)
+        setReferenceImages((prev) =>
+          prev.map((item) =>
+            item.id === id ? { ...item, file: ready.file } : item
+          )
+        )
+        if (!ready.file) {
+          throw new Error('missing file')
+        }
+        return ready.file
+      })
+      .catch((err) => {
+        pendingReferenceFiles.current.delete(id)
+        setReferenceImages((prev) => {
+          const kept = prev.filter((item) => item.id !== id)
+          referenceImagesRef.current = kept
+          return kept
+        })
+        throw err
+      })
+    pendingReferenceFiles.current.set(id, pending)
+    await pending
+  }, [])
 
   const deleteCreation = useCallback((id: string) => {
     setCreations((prev) => prev.filter((item) => item.id !== id))
@@ -528,6 +542,9 @@ export function useStudioState(mode: StudioMode) {
     setImageStyle,
     referenceImage,
     setReferenceImage,
+    referenceImages,
+    setReferenceImages,
+    addReferenceFromSrc,
     lastFrameImage,
     setLastFrameImage,
     creations,
