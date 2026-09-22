@@ -73,6 +73,12 @@ export interface CreationItem {
   group?: string
 }
 
+export type StudioReferenceImage = {
+  id: string
+  preview: string
+  file?: File
+}
+
 export interface ImageGenerationRequest {
   model: string
   prompt: string
@@ -83,6 +89,8 @@ export interface ImageGenerationRequest {
   style?: ImageStyle
   response_format?: 'url' | 'b64_json'
   image?: string // Base64 data or data URL for image2image/edits
+  images?: string[]
+  imageFiles?: File[]
   group?: string
 }
 
@@ -130,12 +138,19 @@ export interface OpenAIVideoResponse {
   }
 }
 
+export type StudioPriceDisplay =
+  | { kind: 'request'; amount: string }
+  | { kind: 'token'; input?: string; output?: string }
+
 export interface ModelOption {
   label: string
   value: string
   isPopular?: boolean
   type?: 'image' | 'video' | 'all'
   successRate?: number
+  group?: string
+  groupRatio?: number
+  priceDisplay?: StudioPriceDisplay
 }
 
 export interface GroupOption {

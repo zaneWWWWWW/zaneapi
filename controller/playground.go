@@ -3,14 +3,21 @@ package controller
 import (
 	"errors"
 	"fmt"
+	"io"
+	"net/http"
+	"net/url"
+	"strings"
 
 	"github.com/QuantumNous/new-api/middleware"
 	"github.com/QuantumNous/new-api/model"
 	relaycommon "github.com/QuantumNous/new-api/relay/common"
+	"github.com/QuantumNous/new-api/service"
 	"github.com/QuantumNous/new-api/types"
 
 	"github.com/gin-gonic/gin"
 )
+
+const playgroundImageFetchMaxBytes = 15 << 20
 
 func setupPlaygroundUserToken(c *gin.Context, format types.RelayFormat) (*relaycommon.RelayInfo, *types.NewAPIError) {
 	useAccessToken := c.GetBool("use_access_token")
@@ -37,6 +44,46 @@ func setupPlaygroundUserToken(c *gin.Context, format types.RelayFormat) (*relayc
 	}
 	_ = middleware.SetupContextForToken(c, tempToken)
 	return relayInfo, nil
+}
+
+func PlaygroundImageFile(c *gin.Context) {
+	raw := strings.TrimSpace(c.Query("url"))
+	parsed, err := url.Parse(raw)
+	if err != nil || raw == "" || (parsed.Scheme != "http" && parsed.Scheme != "https") || parsed.Host == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"success": false, "message": "invalid url"})
+		return
+	}
+
+	resp, err := service.DoDownloadRequest(raw, "playground studio reference")
+	if err != nil {
+		c.JSON(http.StatusBadGateway, gin.H{"success": false, "message": "failed to fetch image"})
+		return
+	}
+	defer service.CloseResponseBodyGracefully(resp)
+	if resp.StatusCode != http.StatusOK {
+		c.JSON(http.StatusBadGateway, gin.H{"success": false, "message": "failed to fetch image"})
+		return
+	}
+
+	data, err := io.ReadAll(io.LimitReader(resp.Body, playgroundImageFetchMaxBytes+1))
+	if err != nil {
+		c.JSON(http.StatusBadGateway, gin.H{"success": false, "message": "failed to read image"})
+		return
+	}
+	if len(data) > playgroundImageFetchMaxBytes {
+		c.JSON(http.StatusRequestEntityTooLarge, gin.H{"success": false, "message": "image too large"})
+		return
+	}
+
+	contentType := resp.Header.Get("Content-Type")
+	if !strings.HasPrefix(contentType, "image/") {
+		contentType = http.DetectContentType(data)
+	}
+	if !strings.HasPrefix(contentType, "image/") {
+		c.JSON(http.StatusBadGateway, gin.H{"success": false, "message": "url is not an image"})
+		return
+	}
+	c.Data(http.StatusOK, contentType, data)
 }
 
 func Playground(c *gin.Context) {
